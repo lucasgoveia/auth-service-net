@@ -1,0 +1,39 @@
+version: '3.7'
+services:
+  # DB
+  postgres:
+    image: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hqysxvqw5cgdYyQHTfHe}
+      PGDATA: /data/auth-service_postgres
+    volumes:
+      - auth-service_postgres:/data/auth-service_postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - intranet
+    restart: unless-stopped
+    
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - intranet
+    restart: unless-stopped
+  
+  smtp4dev:
+    image: rnwood/smtp4dev
+    ports:
+      - "3000:80"
+      - '2525:25'
+    networks:
+      - intranet
+    restart: unless-stopped
+  
+networks:
+  intranet:
+
+volumes:
+  auth-service_postgres:

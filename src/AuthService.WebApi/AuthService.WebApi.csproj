@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>26fb5dcc-5220-4434-b3f9-fb42266d7e93</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="Dapper" Version="2.0.151" />
+    <PackageReference Include="FluentValidation" Version="11.7.1" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.7.1" />
+    <PackageReference Include="IdGen" Version="3.0.3" />
+    <PackageReference Include="IdGen.DependencyInjection" Version="3.0.0" />
+    <PackageReference Include="MassTransit.AmazonSQS" Version="8.1.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="7.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="7.0.10" />
+    <PackageReference Include="Npgsql" Version="7.0.4" />
+    <PackageReference Include="Sqids" Version="3.0.2" />
+    <PackageReference Include="StackExchange.Redis" Version="2.6.122" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Modules\Profiles\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AuthService.Consumers\AuthService.Consumers.csproj" />
+    <ProjectReference Include="..\AuthService.Mailing\AuthService.Mailing.csproj" />
+    <ProjectReference Include="..\AuthService.Messages\AuthService.Messages.csproj" />
+  </ItemGroup>
+
+</Project>

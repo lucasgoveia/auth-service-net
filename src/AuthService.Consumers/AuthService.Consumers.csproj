@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="MassTransit.AmazonSQS" Version="8.1.0" />
+      <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\AuthService.EmailTemplating\AuthService.EmailTemplating.csproj" />
+      <ProjectReference Include="..\AuthService.Mailing\AuthService.Mailing.csproj" />
+      <ProjectReference Include="..\AuthService.Messages\AuthService.Messages.csproj" />
+    </ItemGroup>
+
+</Project>

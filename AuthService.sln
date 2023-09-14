@@ -1,0 +1,60 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{530F3D08-06B6-4674-A37E-6E26DC9E0065}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuthService.WebApi", "src\AuthService.WebApi\AuthService.WebApi.csproj", "{88507058-8F3F-47D4-808D-FCF64BC0B8AA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "deps", "deps", "{F03439E7-628D-45FA-96AA-84088BB2ADB1}"
+	ProjectSection(SolutionItems) = preProject
+		database.hcl = database.hcl
+		docker-compose.yml = docker-compose.yml
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuthService.Messages", "src\AuthService.Messages\AuthService.Messages.csproj", "{FC3AEBE2-E50C-4A07-A640-3D850D7A660A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuthService.Consumers", "src\AuthService.Consumers\AuthService.Consumers.csproj", "{FFF0FA74-D7E6-4C90-9781-577716FE10D8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuthService.EmailTemplating", "src\AuthService.EmailTemplating\AuthService.EmailTemplating.csproj", "{D1167540-E7A8-49AB-AB0C-01D76604371D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuthService.Mailing", "src\AuthService.Mailing\AuthService.Mailing.csproj", "{D1D0DB0E-28BE-4A03-B1F3-F1958DD0916D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{88507058-8F3F-47D4-808D-FCF64BC0B8AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{88507058-8F3F-47D4-808D-FCF64BC0B8AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{88507058-8F3F-47D4-808D-FCF64BC0B8AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{88507058-8F3F-47D4-808D-FCF64BC0B8AA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FC3AEBE2-E50C-4A07-A640-3D850D7A660A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FC3AEBE2-E50C-4A07-A640-3D850D7A660A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FC3AEBE2-E50C-4A07-A640-3D850D7A660A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FC3AEBE2-E50C-4A07-A640-3D850D7A660A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FFF0FA74-D7E6-4C90-9781-577716FE10D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FFF0FA74-D7E6-4C90-9781-577716FE10D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FFF0FA74-D7E6-4C90-9781-577716FE10D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FFF0FA74-D7E6-4C90-9781-577716FE10D8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D1167540-E7A8-49AB-AB0C-01D76604371D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1167540-E7A8-49AB-AB0C-01D76604371D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1167540-E7A8-49AB-AB0C-01D76604371D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1167540-E7A8-49AB-AB0C-01D76604371D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D1D0DB0E-28BE-4A03-B1F3-F1958DD0916D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1D0DB0E-28BE-4A03-B1F3-F1958DD0916D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1D0DB0E-28BE-4A03-B1F3-F1958DD0916D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1D0DB0E-28BE-4A03-B1F3-F1958DD0916D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{88507058-8F3F-47D4-808D-FCF64BC0B8AA} = {530F3D08-06B6-4674-A37E-6E26DC9E0065}
+		{FFF0FA74-D7E6-4C90-9781-577716FE10D8} = {530F3D08-06B6-4674-A37E-6E26DC9E0065}
+		{D1167540-E7A8-49AB-AB0C-01D76604371D} = {530F3D08-06B6-4674-A37E-6E26DC9E0065}
+		{D1D0DB0E-28BE-4A03-B1F3-F1958DD0916D} = {530F3D08-06B6-4674-A37E-6E26DC9E0065}
+	EndGlobalSection
+EndGlobal
