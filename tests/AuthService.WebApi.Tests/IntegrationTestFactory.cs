@@ -1,0 +1,170 @@
+﻿using System.Data;
+using System.Data.Common;
+using AuthService.Consumers.CommandHandlers;
+using AuthService.Mailing;
+using AuthService.WebApi.Common.Auth;
+using AuthService.WebApi.Common.Caching;
+using AuthService.WebApi.Common.Messaging;
+using AuthService.WebApi.Tests.Fakes;
+using Dapper;
+using MassTransit;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Npgsql;
+using NSubstitute;
+using Respawn;
+using Testcontainers.PostgreSql;
+
+namespace AuthService.WebApi.Tests;
+
+public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _postgresqlContainer = new PostgreSqlBuilder()
+        .WithImage("postgres:latest")
+        .WithPassword("DB_SECURE_PASSWORD")
+        .WithUsername("postgres")
+        .WithName($"auth-service-test-postgres-{Guid.NewGuid()}")
+        .WithPortBinding(5432, true)
+        .WithCleanUp(true)
+        .Build();
+
+    private Respawner _respawner = default!;
+
+    public readonly IEmailSender EmailSender = Substitute.For<IEmailSender>();
+    public IMessageBus MessageBus => Services.GetRequiredService<IMessageBus>();
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Testing");
+        Environment.SetEnvironmentVariable("JwtConfiguration__AccessTokenSecret", "ACCESS_VERY_SECURE_SECRET_______");
+        Environment.SetEnvironmentVariable("JwtConfiguration__RefreshTokenSecret",
+            "REFRESH_VERY_SECURE_SECRET________");
+        Environment.SetEnvironmentVariable("JwtConfiguration__AccessTokenMinutesLifetime", "5");
+        Environment.SetEnvironmentVariable("JwtConfiguration__RefreshTokenHoursLifetime", "4");
+        Environment.SetEnvironmentVariable("JwtConfiguration__Issuer", "http://localhost:7101");
+        builder.ConfigureServices(services =>
+            {
+                var servicesToRemove = new List<Type>
+                {
+                    typeof(IHostedService),
+                    typeof(IDistributedCache),
+                    typeof(IMessageBus),
+                    typeof(IDbConnection),
+                    typeof(ICacher),
+                    typeof(IEmailSender),
+                    typeof(IDeviceIdentifier)
+                };
+                var contextsDescriptor = services.Where(d => servicesToRemove.Contains(d.ServiceType)).ToList();
+                foreach (var descriptor in contextsDescriptor)
+                    services.Remove(descriptor);
+
+                AddExtraServices(services);
+            })
+            .ConfigureLogging(o => o.AddFilter(loglevel => loglevel >= LogLevel.Warning));
+        base.ConfigureWebHost(builder);
+    }
+
+    private void AddExtraServices(IServiceCollection services)
+    {
+        services.AddScoped<IDbConnection>(_ => new NpgsqlConnection(_postgresqlContainer.GetConnectionString()));
+        services.AddSingleton<IMessageBus, FakeMessageBus>();
+        services.AddSingleton<ICacher, FakeCacher>();
+        services.AddSingleton<IEmailSender>(_ => EmailSender);
+
+        services.AddSingleton<IDeviceIdentifier>(_ =>
+        {
+            var deviceIdentifier = Substitute.For<IDeviceIdentifier>();
+            deviceIdentifier.Identify().Returns(new DeviceDto()
+            {
+                Fingerprint = "fingerprint",
+                IpAddress = "127.0.0.1",
+                UserAgent = "testing-agent"
+            });
+
+            return deviceIdentifier;
+        });
+
+        // Registers all consumers
+        typeof(SendEmailVerificationConsumer).Assembly.GetTypes()
+            .Where(item => item.GetInterfaces()
+                               .Where(i => i.IsGenericType)
+                               .Any(i => i.GetGenericTypeDefinition() == typeof(IConsumer<>)) &&
+                           item is { IsAbstract: false, IsInterface: false })
+            .ToList()
+            .ForEach(assignedTypes =>
+            {
+                var serviceType = assignedTypes.GetInterfaces()
+                    .First(i => i.GetGenericTypeDefinition() == typeof(IConsumer<>));
+                services.AddScoped(serviceType, assignedTypes);
+            });
+    }
+
+    public async Task InitializeAsync()
+    {
+        await _postgresqlContainer.StartAsync();
+        await using var connection = new NpgsqlConnection(_postgresqlContainer.GetConnectionString());
+        await connection.OpenAsync();
+
+        await MigrateDb(connection);
+
+        await SetupRespawnerAsync(connection);
+        await ResetDatabaseAsync(connection);
+    }
+
+    public async Task MigrateDb(DbConnection conn)
+    {
+        var assembly = typeof(IAssemblyMarker).Assembly;
+        var resources = assembly.GetManifestResourceNames();
+
+        var migrationsFiles = resources.Where(x => x.EndsWith(".sql")).ToList();
+
+        foreach (var migrationFile in migrationsFiles)
+        {
+            await using var stream = assembly.GetManifestResourceStream(migrationFile);
+            using var reader = new StreamReader(stream!);
+            var migrationSql = await reader.ReadToEndAsync();
+
+            await conn.ExecuteAsync(migrationSql);
+        }
+    }
+
+    public async Task ResetDatabaseAsync(DbConnection conn)
+    {
+        await _respawner.ResetAsync(conn);
+    }
+    
+    public async Task ResetDatabaseAsync()
+    {
+        await using var conn = new NpgsqlConnection(_postgresqlContainer.GetConnectionString());
+        await conn.OpenAsync();
+        await _respawner.ResetAsync(conn);
+    }
+    
+    public async Task ResetCacheAsync()
+    {
+        var cacher = (FakeCacher)Services.GetRequiredService<ICacher>();
+        await cacher.Reset();
+    }
+    
+    public async Task ResetBusAsync()
+    {
+        var bus = (FakeMessageBus)Services.GetRequiredService<IMessageBus>();
+        await bus.Reset();
+    }
+
+    private async Task SetupRespawnerAsync(DbConnection conn)
+    {
+        _respawner = await Respawner.CreateAsync(conn,
+            new RespawnerOptions
+            {
+                DbAdapter = DbAdapter.Postgres,
+                SchemasToInclude = new[] { "iam" },
+            });
+    }
+
+    async Task IAsyncLifetime.DisposeAsync() => await _postgresqlContainer.DisposeAsync();
+}

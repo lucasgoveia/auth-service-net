@@ -1,6 +1,7 @@
 ﻿using System.Data;
 using AuthService.WebApi.Common;
 using AuthService.WebApi.Common.Auth;
+using AuthService.WebApi.Common.Consts;
 using AuthService.WebApi.Common.Result;
 using AuthService.WebApi.Common.Security;
 using AuthService.WebApi.Common.Timestamp;
@@ -14,7 +15,6 @@ public record RegisterAccount
 {
     public required string Email { get; init; }
     public required string Password { get; init; }
-    public required string Fingerprint { get; init; }
 }
 
 public class RegisterAccountValidator : AbstractValidator<RegisterAccount>
@@ -29,6 +29,9 @@ public class RegisterAccountValidator : AbstractValidator<RegisterAccount>
         RuleFor(x => x.Password)
             .NotEmpty()
             .MustAsync(async (p, ct) => await passwordPolicy.IsValid(p));
+
+        RuleFor(x => x.Password)
+            .NotEmpty();
     }
 }
 
@@ -70,21 +73,21 @@ public sealed class RegisterAccountHandler
         }
 
         var hashedPassword = _passwordHasher.Hash(req.Password);
-        var accountId = await _generateId();
-        var account = Account.CreateNewAccount(accountId, req.Email, hashedPassword, req.Email, _utcNow());
+        var identityId = await _generateId();
+        var account = Identity.CreateNewIdentity(identityId, req.Email, hashedPassword, req.Email, _utcNow());
 
         await _saver.Save(account);
 
-        await _emailVerificationManager.SendCode(accountId, req.Email);
+        await _emailVerificationManager.SendCode(identityId, req.Email);
 
-        return (await _authenticationService.LogIn(req.Email, req.Password, req.Fingerprint, ct))
-            .Map(accessToken => new RegisterAccountResponse { AccessToken = accessToken });
+        var accessToken = await _authenticationService.Authenticate(identityId, ct);
+        return SuccessResult.Success(new RegisterAccountResponse { AccessToken = accessToken });
     }
 }
 
 public interface INewAccountSaver
 {
-    Task Save(Account account);
+    Task Save(Identity identity);
 }
 
 public class NewAccountSaver : INewAccountSaver
@@ -96,18 +99,18 @@ public class NewAccountSaver : INewAccountSaver
         _dbConnection = dbConnection;
     }
 
-    public async Task Save(Account account)
+    public async Task Save(Identity identity)
     {
         await _dbConnection.ExecuteAsync(
-            "INSERT INTO iam.identity (id, username, password_hash, email, created_at, updated_at) VALUES (@Id, @Username, @PasswordHash, @Email, @CreatedAt, @UpdatedAt)",
+            $"INSERT INTO {TableNames.Identities} (id, username, password_hash, email, created_at, updated_at) VALUES (@Id, @Username, @PasswordHash, @Email, @CreatedAt, @UpdatedAt)",
             new
             {
-                account.Id,
-                account.Username,
-                account.PasswordHash,
-                account.Email,
-                account.CreatedAt,
-                account.UpdatedAt,
+                identity.Id,
+                identity.Username,
+                identity.PasswordHash,
+                identity.Email,
+                identity.CreatedAt,
+                identity.UpdatedAt,
             });
     }
 }

@@ -2,6 +2,7 @@
 using System.Security.Cryptography;
 using AuthService.Messages.Commands;
 using AuthService.WebApi.Common.Caching;
+using AuthService.WebApi.Common.Messaging;
 using AuthService.WebApi.Common.Security;
 using MassTransit;
 
@@ -89,9 +90,9 @@ public interface IEmailVerificationCodeSender
 
 public class EmailVerificationCodeSender : IEmailVerificationCodeSender
 {
-    private readonly IPublishEndpoint _bus;
+    private readonly IMessageBus _bus;
 
-    public EmailVerificationCodeSender(IPublishEndpoint bus)
+    public EmailVerificationCodeSender(IMessageBus bus)
     {
         _bus = bus;
     }

@@ -1,14 +1,13 @@
 using System.Data;
-using Amazon.Runtime;
 using AuthService.Mailing;
 using AuthService.WebApi.Common;
-using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Common.Caching;
 using AuthService.WebApi.Common.Security;
 using AuthService.WebApi.Common.Timestamp;
 using AuthService.WebApi.Configurations;
 using AuthService.WebApi.Modules.Accounts;
 using AuthService.WebApi.Modules.Accounts.UseCases;
+using AuthService.WebApi.Modules.Auth;
 using FluentValidation;
 using IdGen;
 using IdGen.DependencyInjection;
@@ -24,11 +23,7 @@ builder.Services.AddSwaggerGen();
 
 builder.AddBusSetup();
 
-var awsCredentials = new BasicAWSCredentials(
-    builder.Configuration.GetValue<string>("aws_access_key_id"),
-    builder.Configuration.GetValue<string>("aws_secret_access_key"));
-
-builder.Services.AddMailingSetup(awsCredentials);
+builder.Services.AddMailingSetup();
 
 builder.Services.AddScoped<IDbConnection>(_ =>
     new NpgsqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -49,6 +44,7 @@ builder.Services.AddSingleton<GenerateId>(sp => () => Task.FromResult(sp.GetRequ
 builder.AddAuthSetup();
 
 builder.Services.AddAccountsFunctionality();
+builder.Services.AddAuthFunctionality();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthorization();
@@ -62,11 +58,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapAccountsEndpoints();
+app.MapAuthEndpoints();
 
 app.Run();

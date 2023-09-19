@@ -8,13 +8,8 @@ namespace AuthService.Mailing;
 
 public static class MailingConfiguration
 {
-    public static IServiceCollection AddMailingSetup(this IServiceCollection services, BasicAWSCredentials credentials)
+    public static IServiceCollection AddMailingSetup(this IServiceCollection services)
     {
-        var sesConfig = new AmazonSimpleEmailServiceConfig { RegionEndpoint = RegionEndpoint.SAEast1 };
-
-        services.AddSingleton<IAmazonSimpleEmailService>(
-            _ => new AmazonSimpleEmailServiceClient(credentials, sesConfig));
-
         services.AddSingleton<IEmailSender, EmailSender>();
 
         return services;

@@ -12,13 +12,6 @@ public interface IEmailSender
 
 public class EmailSender : IEmailSender
 {
-    private readonly IAmazonSimpleEmailService _sesClient;
-
-    public EmailSender(IAmazonSimpleEmailService sesClient)
-    {
-        _sesClient = sesClient;
-    }
-
     public async Task SendEmail(string subject, string body, string recipient)
     {
         using var smtpClient = new SmtpClient("localhost", 2525);

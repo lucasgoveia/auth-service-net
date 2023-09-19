@@ -21,6 +21,18 @@ public class RedisCacher : ICacher
             : default;
     }
 
+    public async Task<(T?, TimeSpan?)> GetWithExpiration<T>(string key)
+    {
+        var cacheResult = await _redisDb.StringGetAsync(key);
+
+        if (!cacheResult.IsNullOrEmpty)
+            return default;
+            
+        var ttl = await _redisDb.KeyTimeToLiveAsync(key);
+        
+        return (JsonSerializer.Deserialize<T>(cacheResult.ToString()), ttl);
+    }
+
     public async Task<T> GetOrSet<T>(string key, Func<Task<T>> fetchData, TimeSpan? expiry = null)
     {
         var cacheResult = await _redisDb.StringGetAsync(key);

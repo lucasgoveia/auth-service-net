@@ -1,4 +1,5 @@
 ﻿using AuthService.Consumers.CommandHandlers;
+using AuthService.WebApi.Common.Messaging;
 using MassTransit;
 
 namespace AuthService.WebApi.Configurations;
@@ -7,6 +8,7 @@ public static class BusConfiguration
 {
     public static void AddBusSetup(this WebApplicationBuilder builder)
     {
+        builder.Services.AddScoped<IMessageBus, MessageBus>();
         builder.Services.AddMassTransit(bus =>
         {
             bus.SetKebabCaseEndpointNameFormatter();

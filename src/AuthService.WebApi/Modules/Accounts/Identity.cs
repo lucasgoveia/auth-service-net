@@ -1,6 +1,6 @@
 ﻿namespace AuthService.WebApi.Modules.Accounts;
 
-public record Account
+public record Identity
 {
     public required long Id { get; init; }
     public long? UserId { get; init; }
@@ -18,10 +18,10 @@ public record Account
     public DateTime? LockoutEndDate { get; init; }
     public int AccessFailedCount { get; init; }
     
-    public static Account CreateNewAccount(long id, string username, string passwordHash, string email,
+    public static Identity CreateNewIdentity(long id, string username, string passwordHash, string email,
         DateTime now)
     {
-        return new Account
+        return new Identity
         {
             Id = id,
             Username = username.ToLower().Trim(),

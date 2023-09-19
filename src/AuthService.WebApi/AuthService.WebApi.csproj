@@ -25,7 +25,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Modules\Profiles\" />
+    <Folder Include="Database\" />
+    <Folder Include="Modules\Profiles\UseCases\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Database/**" />
   </ItemGroup>
 
   <ItemGroup>

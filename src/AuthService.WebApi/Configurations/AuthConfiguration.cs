@@ -13,7 +13,9 @@ public static class AuthConfiguration
         var jwtConfig = builder.Configuration.GetSection("JwtConfiguration");
         builder.Services.Configure<JwtConfig>(jwtConfig);
         builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
-        builder.Services.AddTransient<IUserForLoginGetter, UserForLoginGetter>();
+        builder.Services.AddTransient<IIdentityForLoginGetter, IdentityForLoginGetter>();
+        builder.Services.AddTransient<IIdentityDeviceRepository, IdentityDeviceRepository>();
+        builder.Services.AddScoped<IDeviceIdentifier, DeviceIdentifier>();
 
         var base64Key = jwtConfig.GetValue<string>("AccessTokenSecret");
         var issuer = jwtConfig.GetValue<string>("Issuer");

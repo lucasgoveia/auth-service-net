@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using AuthService.WebApi.Common.Consts;
 using AuthService.WebApi.Common.Result;
 using AuthService.WebApi.Common.Timestamp;
 using AuthService.WebApi.Modules.Accounts.Functionality;
@@ -67,7 +68,7 @@ public class AccountEmailVerifiedSetter : IAccountEmailVerifiedSetter
     public async Task Set(long accountId, DateTime utcNow, CancellationToken ct = default)
     {
         await _dbConnection.ExecuteAsync(
-            "UPDATE iam.identity SET email_verified = true, updated_at = @UtcNow WHERE id = @AccountId",
+            $"UPDATE {TableNames.Identities} SET email_verified = true, updated_at = @UtcNow WHERE id = @AccountId",
             new { AccountId = accountId, UtcNow = utcNow });
     }
 }
