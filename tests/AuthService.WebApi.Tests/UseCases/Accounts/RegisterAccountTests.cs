@@ -1,9 +1,9 @@
 ﻿using System.Data;
 using System.Net;
 using System.Net.Http.Json;
-using AuthService.Messages.Commands;
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Common.Consts;
+using AuthService.WebApi.Messages.Commands;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Tests.Fakes;
 using AuthService.WebApi.Tests.Utils;
@@ -121,7 +121,8 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
 
         // Assert
         res.Should().BeSuccessful();
-        res.GetCookies().Should().Contain(x => x.Name == AuthenticationService.RefreshTokenCookieName && !string.IsNullOrEmpty(x.Value));
+        res.GetCookies().Should().Contain(x =>
+            x.Name == AuthenticationService.RefreshTokenCookieName && !string.IsNullOrEmpty(x.Value));
     }
 
     [Fact]
@@ -141,7 +142,7 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
         ((FakeMessageBus)MessageBus).Messages.Should().Contain(x =>
             x is SendEmailVerification && ((SendEmailVerification)x).Email == registerAccountRequest.Email);
     }
-    
+
     [Fact]
     public async Task Register_account_should_save_identity_to_db()
     {
@@ -157,8 +158,8 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
 
         // Assert
         (await Factory.Services.GetRequiredService<IDbConnection>()
-            .QuerySingleOrDefaultAsync<int>($"SELECT COUNT(*) FROM {TableNames.Identities} WHERE username = @Email",
-                new { registerAccountRequest.Email }))
+                .QuerySingleOrDefaultAsync<int>($"SELECT COUNT(*) FROM {TableNames.Identities} WHERE username = @Email",
+                    new { registerAccountRequest.Email }))
             .Should().Be(1);
     }
 }

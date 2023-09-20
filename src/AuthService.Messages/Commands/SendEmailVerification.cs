@@ -1,4 +1,4 @@
-﻿namespace AuthService.Messages.Commands;
+﻿namespace AuthService.WebApi.Messages.Commands;
 
 public record SendEmailVerification
 {

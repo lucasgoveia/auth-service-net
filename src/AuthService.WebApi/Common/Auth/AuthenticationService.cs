@@ -5,8 +5,10 @@ using System.Security.Claims;
 using System.Text;
 using AuthService.WebApi.Common.Caching;
 using AuthService.WebApi.Common.Consts;
+using AuthService.WebApi.Common.Devices;
 using AuthService.WebApi.Common.Result;
 using AuthService.WebApi.Common.Security;
+using AuthService.WebApi.Common.Timestamp;
 using Dapper;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -15,12 +17,11 @@ namespace AuthService.WebApi.Common.Auth;
 
 public interface IAuthenticationService
 {
-    Task<Result<string>> LogIn(string username, string password, CancellationToken ct = default);
-
-    Task<string> Authenticate(long identityId, CancellationToken ct = default);
+    Task<Result<string>> LogIn(string username, string password, bool rememberMe, CancellationToken ct = default);
+    Task<string> Authenticate(long identityId, bool rememberMe, CancellationToken ct = default);
     Task LogOut(CancellationToken ct = default);
-
     Task<Result<string>> RefreshToken(CancellationToken ct = default);
+    Task<bool> IsAccessTokenRevoked(string accessToken, CancellationToken ct = default);
 }
 
 public record JwtConfig
@@ -29,13 +30,15 @@ public record JwtConfig
     public required string RefreshTokenSecret { get; init; }
     public required int AccessTokenMinutesLifetime { get; init; }
     public required int RefreshTokenHoursLifetime { get; init; }
+    public required int RefreshTokenInTrustedDevicesHoursLifetime { get; init; }
+    public required int RefreshTokenAllowedRenewsCount { get; init; }
     public required string Issuer { get; init; }
 }
 
 public record RefreshTokenInfo
 {
     public int UsageCount { get; init; }
-    public bool AllowRenew { get; init; }
+    public bool TrustedDevice { get; init; }
 }
 
 public class AuthenticationService : IAuthenticationService
@@ -45,69 +48,91 @@ public class AuthenticationService : IAuthenticationService
     private readonly IPasswordHasher _passwordHasher;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ICacher _cacher;
-    private readonly ILogger<AuthenticationService> _logger;
     private readonly IDeviceIdentifier _deviceIdentifier;
     private readonly IIdentityDeviceRepository _identityDeviceRepository;
+    private readonly UtcNow _utcNow;
 
     public const string RefreshTokenCookieName = "refresh-token";
 
     public AuthenticationService(IOptions<JwtConfig> jwtOptions, IIdentityForLoginGetter identityForLoginGetter,
         IPasswordHasher passwordHasher, IHttpContextAccessor httpContextAccessor, ICacher cacher,
-        ILogger<AuthenticationService> logger, IIdentityDeviceRepository identityDeviceRepository,
-        IDeviceIdentifier deviceIdentifier)
+        IIdentityDeviceRepository identityDeviceRepository,
+        IDeviceIdentifier deviceIdentifier, UtcNow utcNow)
     {
         _identityForLoginGetter = identityForLoginGetter;
         _passwordHasher = passwordHasher;
         _httpContextAccessor = httpContextAccessor;
         _cacher = cacher;
-        _logger = logger;
         _identityDeviceRepository = identityDeviceRepository;
         _deviceIdentifier = deviceIdentifier;
+        _utcNow = utcNow;
         _jwtConfig = jwtOptions.Value;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static string BuildRefreshTokenKey(string deviceId, string refreshToken) =>
         $"accounts:sessions:{deviceId}:refresh-token:{refreshToken}";
-    
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static string BuildRevokedAccessTokenKey(string accessToken) =>
-        $"accounts:revoked-tokens:{accessToken}";
+        $"accounts:revoked-access-tokens:{accessToken}";
 
-    public async Task<string> Authenticate(long identityId, CancellationToken ct = default)
+    public async Task<string> Authenticate(long identityId, bool rememberMe, CancellationToken ct = default)
     {
+        var refreshTokenLifetime = GetRefreshTokenLifetime(rememberMe);
+
         var accessToken = GenerateAccessToken(identityId);
-        var refreshToken = GenerateRefreshToken(identityId);
 
         var device = _deviceIdentifier.Identify();
 
-        await _cacher.Set(BuildRefreshTokenKey(device.Fingerprint, refreshToken),
-            // will always allow renewing the token for now
-            new RefreshTokenInfo { AllowRenew = true, UsageCount = 0 },
-            TimeSpan.FromHours(_jwtConfig.RefreshTokenHoursLifetime));
+        await GenerateAndSetRefreshToken(rememberMe, identityId, device.Fingerprint, refreshTokenLifetime);
 
-        await _identityDeviceRepository.Add(new IdentityDevice
+        if (rememberMe)
         {
-            Name = device.UserAgent,
-            DeviceFingerprint = device.Fingerprint,
-            IdentityId = identityId,
-            IpAddress = device.IpAddress,
-        });
+            await _identityDeviceRepository.Add(new IdentityDevice
+            {
+                Name = device.UserAgent,
+                DeviceFingerprint = device.Fingerprint,
+                IdentityId = identityId,
+                IpAddress = device.IpAddress,
+            });
+        }
 
+        return accessToken;
+    }
+
+    private TimeSpan GetRefreshTokenLifetime(bool trustedDevice)
+    {
+        var refreshTokenLifetime = trustedDevice
+            ? TimeSpan.FromHours(_jwtConfig.RefreshTokenInTrustedDevicesHoursLifetime)
+            : TimeSpan.FromHours(_jwtConfig.RefreshTokenHoursLifetime);
+        return refreshTokenLifetime;
+    }
+
+    private async Task GenerateAndSetRefreshToken(bool trustedDevice, long identityId, string deviceFingerprint,
+        TimeSpan expiration)
+    {
+        var refreshToken = GenerateRefreshToken(identityId, expiration);
+
+        await _cacher.Set(
+            BuildRefreshTokenKey(deviceFingerprint, refreshToken),
+            new RefreshTokenInfo { TrustedDevice = trustedDevice, UsageCount = 0 },
+            expiration
+        );
+        
         _httpContextAccessor.HttpContext!.Response.Cookies.Append(RefreshTokenCookieName, refreshToken,
             new CookieOptions
             {
                 Secure = true,
                 Path = "/",
                 HttpOnly = true,
-                Expires = DateTimeOffset.UtcNow.AddHours(_jwtConfig.RefreshTokenHoursLifetime),
-                MaxAge = TimeSpan.FromHours(_jwtConfig.RefreshTokenHoursLifetime)
+                Expires = _utcNow().Add(expiration),
+                MaxAge = expiration
             });
-
-        return accessToken;
     }
 
-    public async Task<Result<string>> LogIn(string username, string password, CancellationToken ct = default)
+    public async Task<Result<string>> LogIn(string username, string password, bool rememberMe,
+        CancellationToken ct = default)
     {
         var user = await _identityForLoginGetter.Get(username, ct);
 
@@ -121,7 +146,7 @@ public class AuthenticationService : IAuthenticationService
             return ErrorResult.Unauthorized();
         }
 
-        var accessToken = await Authenticate(user.Id, ct);
+        var accessToken = await Authenticate(user.Id, rememberMe, ct);
 
         return SuccessResult.Success(accessToken);
     }
@@ -138,12 +163,36 @@ public class AuthenticationService : IAuthenticationService
             await _cacher.Remove(BuildRefreshTokenKey(device.Fingerprint, refreshToken));
             _httpContextAccessor.HttpContext!.Response.Cookies.Delete(RefreshTokenCookieName);
         }
-        
+
         await _identityDeviceRepository.Remove(device.Fingerprint);
-        
-        await _cacher.Set(BuildRevokedAccessTokenKey(accessToken), true, TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
+
+        await _cacher.Set(BuildRevokedAccessTokenKey(accessToken), true,
+            TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
     }
 
+    public async Task<bool> AllowTokenRefresh(string deviceFingerprint, long identityId,
+        RefreshTokenInfo? refreshTokenInfo)
+    {
+        var storedDevice = await _identityDeviceRepository.Get(deviceFingerprint);
+
+        if (storedDevice is null || storedDevice.IdentityId != identityId)
+        {
+            return false;
+        }
+
+        if (refreshTokenInfo is null)
+        {
+            return false;
+        }
+
+        if (refreshTokenInfo.UsageCount + 1 > _jwtConfig.RefreshTokenAllowedRenewsCount)
+        {
+            return false;
+        }
+
+        return true;
+    }
+    
     public async Task<Result<string>> RefreshToken(CancellationToken ct = default)
     {
         var device = _deviceIdentifier.Identify();
@@ -157,10 +206,23 @@ public class AuthenticationService : IAuthenticationService
         var (info, expiry) =
             await _cacher.GetWithExpiration<RefreshTokenInfo>(BuildRefreshTokenKey(device.Fingerprint, refreshToken));
 
-        if (info is null)
+        var identityId = GetIdentityIdFromToken(refreshToken);
+
+        if (!await AllowTokenRefresh(device.Fingerprint, identityId, info))
         {
-            _httpContextAccessor.HttpContext!.Response.Cookies.Delete(RefreshTokenCookieName);
+            await RemoveRefreshToken(device, refreshToken);
             return ErrorResult.Unauthorized();
+        }
+
+        if (info!.UsageCount + 1 == _jwtConfig.RefreshTokenAllowedRenewsCount)
+        {
+            var newExpiration = info.TrustedDevice
+                ? TimeSpan.FromHours(_jwtConfig.RefreshTokenInTrustedDevicesHoursLifetime)
+                : expiry.GetValueOrDefault();
+            
+            await GenerateAndSetRefreshToken(true, identityId, device.Fingerprint, newExpiration);
+            
+            return SuccessResult.Success(GenerateAccessTokenFromRefreshToken(refreshToken));
         }
 
         await _cacher.Set(BuildRefreshTokenKey(device.Fingerprint, refreshToken),
@@ -170,10 +232,20 @@ public class AuthenticationService : IAuthenticationService
         return SuccessResult.Success(GenerateAccessTokenFromRefreshToken(refreshToken));
     }
 
-    private string GenerateRefreshToken(long identityId)
+    private async Task RemoveRefreshToken(DeviceDto device, string refreshToken)
     {
-        return GenerateToken(identityId, _jwtConfig.RefreshTokenSecret,
-            TimeSpan.FromMinutes(_jwtConfig.RefreshTokenHoursLifetime));
+        _httpContextAccessor.HttpContext!.Response.Cookies.Delete(RefreshTokenCookieName);
+        await _cacher.Remove(BuildRefreshTokenKey(device.Fingerprint, refreshToken));
+    }
+
+    public async Task<bool> IsAccessTokenRevoked(string accessToken, CancellationToken ct = default)
+    {
+        return await _cacher.Get<bool?>(BuildRevokedAccessTokenKey(accessToken)) ?? false;
+    }
+
+    private string GenerateRefreshToken(long identityId, TimeSpan lifetime)
+    {
+        return GenerateToken(identityId, _jwtConfig.RefreshTokenSecret, lifetime);
     }
 
     private string GenerateAccessToken(long identityId)
@@ -181,7 +253,7 @@ public class AuthenticationService : IAuthenticationService
         return GenerateToken(identityId, _jwtConfig.AccessTokenSecret,
             TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
     }
-    
+
     private long GetIdentityIdFromToken(string token)
     {
         var handler = new JwtSecurityTokenHandler();
@@ -198,12 +270,14 @@ public class AuthenticationService : IAuthenticationService
 
     private string GenerateToken(long identityId, string secret, TimeSpan lifetime)
     {
+        var now = _utcNow();
         var claims = new[]
         {
-            new Claim(JwtRegisteredClaimNames.Sub, identityId.ToString())
+            new Claim(JwtRegisteredClaimNames.Sub, identityId.ToString()),
+            new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64)
         };
 
-        var expiry = DateTime.UtcNow.Add(lifetime);
+        var expiry = _utcNow().Add(lifetime);
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
@@ -212,7 +286,8 @@ public class AuthenticationService : IAuthenticationService
             audience: "localhost",
             claims: claims,
             expires: expiry,
-            signingCredentials: credentials
+            signingCredentials: credentials,
+            notBefore: now
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
@@ -222,7 +297,6 @@ public class AuthenticationService : IAuthenticationService
 public record IdentityForLogin
 {
     public required long Id { get; init; }
-    public required string Username { get; init; }
     public required string PasswordHash { get; init; }
 }
 
@@ -243,7 +317,7 @@ public class IdentityForLoginGetter : IIdentityForLoginGetter
     public Task<IdentityForLogin?> Get(string username, CancellationToken ct = default)
     {
         return _dbConnection.QuerySingleOrDefaultAsync<IdentityForLogin?>(
-            $"SELECT id as Id, username as Username , password_hash as PasswordHash FROM {TableNames.Identities} WHERE LOWER(username) = @Username",
+            $"SELECT id, password_hash FROM {TableNames.Identities} WHERE LOWER(username) = @Username",
             new { Username = username.ToLower() });
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace AuthService.WebApi.Common.Auth;
+﻿namespace AuthService.WebApi.Common.Devices;
 
 public record DeviceDto
 {

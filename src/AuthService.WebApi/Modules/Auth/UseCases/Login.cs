@@ -7,6 +7,7 @@ public record Login
 {
     public required string Username { get; init; }
     public required string Password { get; init; }
+    public required bool RememberMe { get; init; }
 }
 
 public record LoginResponse
@@ -25,7 +26,7 @@ public class LoginHandler
 
     public async Task<Result<LoginResponse>> Handle(Login req, CancellationToken ct = default)
     {
-        var result = await _authenticationService.LogIn(req.Username, req.Password, ct);
+        var result = await _authenticationService.LogIn(req.Username, req.Password, req.RememberMe, ct);
 
         return result.Map(accessToken => new LoginResponse { AccessToken = accessToken });
     }

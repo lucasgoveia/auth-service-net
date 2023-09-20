@@ -80,7 +80,7 @@ public sealed class RegisterAccountHandler
 
         await _emailVerificationManager.SendCode(identityId, req.Email);
 
-        var accessToken = await _authenticationService.Authenticate(identityId, ct);
+        var accessToken = await _authenticationService.Authenticate(identityId, true, ct);
         return SuccessResult.Success(new RegisterAccountResponse { AccessToken = accessToken });
     }
 }

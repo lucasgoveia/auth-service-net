@@ -36,6 +36,7 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
         {
             Username = TestEmail,
             Password = TestPassword,
+            RememberMe = false,
         };
 
         // Act
@@ -53,6 +54,7 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
         {
             Username = TestEmail,
             Password = TestPassword,
+            RememberMe = false,
         };
 
         // Act
@@ -71,6 +73,7 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
         {
             Username = TestEmail,
             Password = "INVALID_PASSWORD",
+            RememberMe = false,
         };
 
         // Act
@@ -88,6 +91,7 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
         {
             Username = "some_other_email@example.com",
             Password = TestPassword,
+            RememberMe = false,
         };
 
         // Act

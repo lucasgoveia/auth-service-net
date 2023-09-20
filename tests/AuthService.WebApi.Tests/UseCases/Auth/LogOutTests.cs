@@ -84,7 +84,7 @@ public class LogOutTests : TestBase, IClassFixture<IntegrationTestFactory>
         res.GetCookies()
             .Should()
             .Contain(x =>
-                x.Name == AuthenticationService.RefreshTokenCookieName && x.Expires < DateTimeOffset.UtcNow &&
+                x.Name == AuthenticationService.RefreshTokenCookieName && x.Expires < DateTimeHolder.MockedUtcNow &&
                 x.Value == string.Empty);
     }
 }

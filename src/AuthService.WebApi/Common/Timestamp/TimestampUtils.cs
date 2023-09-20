@@ -6,6 +6,6 @@ public static class TimestampUtils
 {
     public static DateTime UtcNow()
     {
-        return DateTime.Now;
+        return DateTime.UtcNow;
     }
 }

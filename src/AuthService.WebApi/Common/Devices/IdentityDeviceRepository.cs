@@ -2,7 +2,7 @@
 using AuthService.WebApi.Common.Consts;
 using Dapper;
 
-namespace AuthService.WebApi.Common.Auth;
+namespace AuthService.WebApi.Common.Devices;
 
 public record IdentityDevice
 {
@@ -17,6 +17,7 @@ public interface IIdentityDeviceRepository
 {
     public Task Add(IdentityDevice device);
     public Task Remove(string deviceFingerprint);
+    Task<IdentityDevice?> Get(string deviceFingerprint);
 }
 
 public class IdentityDeviceRepository : IIdentityDeviceRepository
@@ -43,6 +44,15 @@ public class IdentityDeviceRepository : IIdentityDeviceRepository
 
     public async Task Remove(string deviceFingerprint)
     {
-        await _dbConnection.ExecuteAsync($"DELETE FROM {TableNames.IdentityDevices} WHERE device_fingerprint = @deviceFingerprint;", new { deviceFingerprint });
+        await _dbConnection.ExecuteAsync(
+            $"DELETE FROM {TableNames.IdentityDevices} WHERE device_fingerprint = @deviceFingerprint;",
+            new { deviceFingerprint });
+    }
+
+    public Task<IdentityDevice?> Get(string deviceFingerprint)
+    {
+        return _dbConnection.QuerySingleOrDefaultAsync<IdentityDevice?>(
+            $"SELECT * FROM {TableNames.IdentityDevices} WHERE device_fingerprint = @deviceFingerprint;",
+            new { deviceFingerprint });
     }
 }

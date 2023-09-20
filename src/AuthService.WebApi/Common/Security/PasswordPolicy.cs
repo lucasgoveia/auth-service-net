@@ -1,6 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 
-namespace AuthService.WebApi.Modules.Accounts.Functionality;
+namespace AuthService.WebApi.Common.Security;
 
 public interface IPasswordPolicy
 {

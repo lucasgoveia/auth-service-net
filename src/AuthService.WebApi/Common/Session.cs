@@ -1,18 +1,17 @@
 ﻿using System.Security.Claims;
-using Microsoft.IdentityModel.JsonWebTokens;
 
-namespace AuthService.WebApi.Common.Auth;
+namespace AuthService.WebApi.Common;
 
 public interface ISession
 {
-    long? AccountId { get; }
+    long? IdentityId { get; }
     bool IsAuthenticated { get; }
 }
 
 public class Session : ISession
 {
-    public long? AccountId { get; init; }
-    public bool IsAuthenticated => AccountId.HasValue;
+    public long? IdentityId { get; init; }
+    public bool IsAuthenticated => IdentityId.HasValue;
 
     public Session(IHttpContextAccessor httpContextAccessor)
     {
@@ -25,6 +24,6 @@ public class Session : ISession
             return;
         }
 
-        AccountId = long.Parse(accountId);
+        IdentityId = long.Parse(accountId);
     }
 }

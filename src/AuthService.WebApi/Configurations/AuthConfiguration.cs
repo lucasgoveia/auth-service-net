@@ -1,8 +1,8 @@
-﻿using System.Text;
+﻿using AuthService.WebApi.Common;
 using AuthService.WebApi.Common.Auth;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using ISession = AuthService.WebApi.Common.Auth.ISession;
+using AuthService.WebApi.Common.Devices;
+using Microsoft.AspNetCore.Authorization;
+using ISession = AuthService.WebApi.Common.ISession;
 
 namespace AuthService.WebApi.Configurations;
 
@@ -10,40 +10,26 @@ public static class AuthConfiguration
 {
     public static void AddAuthSetup(this WebApplicationBuilder builder)
     {
-        var jwtConfig = builder.Configuration.GetSection("JwtConfiguration");
-        builder.Services.Configure<JwtConfig>(jwtConfig);
+        builder.Services.Configure<JwtConfig>(builder.Configuration.GetSection("JwtConfiguration"));
         builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
         builder.Services.AddTransient<IIdentityForLoginGetter, IdentityForLoginGetter>();
         builder.Services.AddTransient<IIdentityDeviceRepository, IdentityDeviceRepository>();
         builder.Services.AddScoped<IDeviceIdentifier, DeviceIdentifier>();
 
-        var base64Key = jwtConfig.GetValue<string>("AccessTokenSecret");
-        var issuer = jwtConfig.GetValue<string>("Issuer");
-
-        var key = base64Key == null ? null : new SymmetricSecurityKey(Encoding.UTF8.GetBytes(base64Key));
-
         builder.Services.AddTransient<ISession, Session>();
 
         builder.Services
-            .AddAuthentication(options =>
+            .AddAuthentication(CustomJwtAuthentication.Scheme)
+            .AddScheme<CustomJwtAuthenticationOptions, CustomJwtAuthenticationHandler>(CustomJwtAuthentication.Scheme,
+                null);
+
+        builder.Services
+            .AddAuthorization(options =>
             {
-                options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-            .AddJwtBearer(options =>
-                // Opções de validação
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = key,
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    AudienceValidator =
-                        (audiences, _, _) => audiences.Any(),
-                    ValidIssuer = issuer,
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.FromSeconds(30)
-                }
-            );
+                options.InvokeHandlersAfterFailure = false;
+                options.DefaultPolicy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .Build();
+            });
     }
 }

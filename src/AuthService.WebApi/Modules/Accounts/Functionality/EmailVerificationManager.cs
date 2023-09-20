@@ -1,9 +1,9 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
-using AuthService.Messages.Commands;
 using AuthService.WebApi.Common.Caching;
 using AuthService.WebApi.Common.Messaging;
 using AuthService.WebApi.Common.Security;
+using AuthService.WebApi.Messages.Commands;
 using MassTransit;
 
 namespace AuthService.WebApi.Modules.Accounts.Functionality;

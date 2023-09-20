@@ -1,50 +1,87 @@
 ﻿using System.Text.Json;
 using AuthService.WebApi.Common.Caching;
+using AuthService.WebApi.Common.Timestamp;
 
 namespace AuthService.WebApi.Tests.Fakes;
 
+public record FakeCacheEntry
+{
+    public required DateTime? Expiration { get; init; }
+    public required string Value { get; init; }
+}
+
 public class FakeCacher : ICacher
 {
-    private readonly IDictionary<string, string> _cache = new Dictionary<string, string>();
+    private readonly IDictionary<string, FakeCacheEntry> _cache = new Dictionary<string, FakeCacheEntry>();
+    private readonly UtcNow _utcNow;
+
+    public FakeCacher(UtcNow utcNow)
+    {
+        _utcNow = utcNow;
+    }
 
     public Task<T?> Get<T>(string key)
     {
-        if (_cache.TryGetValue(key, out var valueJson))
-            return Task.FromResult(JsonSerializer.Deserialize<T>(valueJson!));
-        
+        if (_cache.TryGetValue(key, out var entry))
+        {
+            if (entry.Expiration > _utcNow())
+            {
+                return Task.FromResult(JsonSerializer.Deserialize<T>(entry.Value));
+            }
+
+            Remove(key);
+        }
+
         return Task.FromResult<T?>(default);
     }
 
-    public async Task<(T?, TimeSpan?)> GetWithExpiration<T>(string key)
+    public Task<(T?, TimeSpan?)> GetWithExpiration<T>(string key)
     {
-        return (await Get<T>(key), null);
+        if (_cache.TryGetValue(key, out var entry))
+        {
+            if (entry.Expiration > _utcNow())
+            {
+                return Task.FromResult((JsonSerializer.Deserialize<T>(entry.Value), entry.Expiration - _utcNow()));
+            }
+
+            Remove(key);
+        }
+
+        return Task.FromResult<(T?, TimeSpan?)>((default, null));
     }
 
     public async Task<T> GetOrSet<T>(string key, Func<Task<T>> fetchData, TimeSpan? expiry = null)
     {
-        var hasValue = _cache.TryGetValue(key, out var valueJson);
-
-        if (!hasValue || string.IsNullOrEmpty(valueJson))
+        if (!_cache.ContainsKey(key))
         {
             var value = await fetchData();
-
-            if (_cache.ContainsKey(key))
-                _cache[key] = JsonSerializer.Serialize(value);
-            else
-                _cache.Add(key, JsonSerializer.Serialize(value));
+            _cache.Add(key,
+                new FakeCacheEntry
+                {
+                    Expiration = _utcNow().Add(expiry ?? TimeSpan.Zero),
+                    Value = JsonSerializer.Serialize(value)
+                });
 
             return value;
         }
 
-        return JsonSerializer.Deserialize<T>(valueJson!)!;
+        return (await Get<T>(key))!;
     }
 
     public Task Set<T>(string key, T data, TimeSpan? expiry = null)
     {
         if (_cache.ContainsKey(key))
-            _cache[key] = JsonSerializer.Serialize(data);
+            _cache[key] = new FakeCacheEntry
+            {
+                Expiration = _utcNow().Add(expiry ?? TimeSpan.Zero),
+                Value = JsonSerializer.Serialize(data)
+            };
         else
-            _cache.Add(key, JsonSerializer.Serialize(data));
+            _cache.Add(key, new FakeCacheEntry
+            {
+                Expiration = _utcNow().Add(expiry ?? TimeSpan.Zero),
+                Value = JsonSerializer.Serialize(data)
+            });
 
         return Task.CompletedTask;
     }
@@ -58,14 +95,11 @@ public class FakeCacher : ICacher
 
     public Task<T?> GetAndRemove<T>(string key)
     {
-        var valueJson = _cache[key];
+        var entry = _cache[key];
 
         _cache.Remove(key);
 
-        if (string.IsNullOrEmpty(valueJson))
-            return Task.FromResult<T?>(default);
-
-        return Task.FromResult(JsonSerializer.Deserialize<T>(valueJson));
+        return Task.FromResult(JsonSerializer.Deserialize<T>(entry.Value));
     }
 
     public Task Reset()

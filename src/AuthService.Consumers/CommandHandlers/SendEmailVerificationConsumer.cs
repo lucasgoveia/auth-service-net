@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using AuthService.EmailTemplating;
 using AuthService.Mailing;
-using AuthService.Messages.Commands;
+using AuthService.WebApi.Messages.Commands;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 

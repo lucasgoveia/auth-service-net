@@ -15,7 +15,7 @@ public static class HttpResponseMessageExtensions
         return cookies ?? new List<Cookie>(capacity: 0);
     }
 
-    private static Cookie CreateCookie(string cookieString)
+    public static Cookie CreateCookie(string cookieString)
     {
         var properties = cookieString.Split(';', StringSplitOptions.TrimEntries);
         var name = properties[0].Split("=")[0];
@@ -25,7 +25,7 @@ public static class HttpResponseMessageExtensions
         {
             Secure = properties.Contains("secure"),
             HttpOnly = properties.Contains("httponly"),
-            Expires = DateTime.Parse(properties[1].Replace("expires=", "")),
+            Expires = DateTime.Parse(properties[1].Replace("expires=", "")).ToUniversalTime(),
         };
         return cookie;
     }

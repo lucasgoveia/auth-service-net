@@ -2,9 +2,10 @@
 using System.Data.Common;
 using AuthService.Consumers.CommandHandlers;
 using AuthService.Mailing;
-using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Common.Caching;
+using AuthService.WebApi.Common.Devices;
 using AuthService.WebApi.Common.Messaging;
+using AuthService.WebApi.Common.Timestamp;
 using AuthService.WebApi.Tests.Fakes;
 using Dapper;
 using MassTransit;
@@ -37,6 +38,8 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
     public readonly IEmailSender EmailSender = Substitute.For<IEmailSender>();
     public IMessageBus MessageBus => Services.GetRequiredService<IMessageBus>();
 
+    public FakeServerDateTimeHolder DateTimeHolder => Services.GetRequiredService<FakeServerDateTimeHolder>();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -44,19 +47,22 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
         Environment.SetEnvironmentVariable("JwtConfiguration__RefreshTokenSecret",
             "REFRESH_VERY_SECURE_SECRET________");
         Environment.SetEnvironmentVariable("JwtConfiguration__AccessTokenMinutesLifetime", "5");
-        Environment.SetEnvironmentVariable("JwtConfiguration__RefreshTokenHoursLifetime", "4");
+        Environment.SetEnvironmentVariable("JwtConfiguration__RefreshTokenHoursLifetime", "8");
+        Environment.SetEnvironmentVariable("JwtConfiguration__RefreshTokenInTrustedDevicesHoursLifetime", "48");
+        Environment.SetEnvironmentVariable("JwtConfiguration__RefreshTokenAllowedRenewsCount", "4");
         Environment.SetEnvironmentVariable("JwtConfiguration__Issuer", "http://localhost:7101");
         builder.ConfigureServices(services =>
             {
                 var servicesToRemove = new List<Type>
                 {
+                    typeof(UtcNow),
                     typeof(IHostedService),
                     typeof(IDistributedCache),
                     typeof(IMessageBus),
                     typeof(IDbConnection),
                     typeof(ICacher),
                     typeof(IEmailSender),
-                    typeof(IDeviceIdentifier)
+                    typeof(IDeviceIdentifier),
                 };
                 var contextsDescriptor = services.Where(d => servicesToRemove.Contains(d.ServiceType)).ToList();
                 foreach (var descriptor in contextsDescriptor)
@@ -72,8 +78,10 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
     {
         services.AddScoped<IDbConnection>(_ => new NpgsqlConnection(_postgresqlContainer.GetConnectionString()));
         services.AddSingleton<IMessageBus, FakeMessageBus>();
-        services.AddSingleton<ICacher, FakeCacher>();
         services.AddSingleton<IEmailSender>(_ => EmailSender);
+        services.AddSingleton<FakeServerDateTimeHolder>();
+        services.AddSingleton<ICacher, FakeCacher>();
+        services.AddSingleton<UtcNow>(sp => () => sp.GetRequiredService<FakeServerDateTimeHolder>().MockedUtcNow);
 
         services.AddSingleton<IDeviceIdentifier>(_ =>
         {
@@ -136,20 +144,20 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
     {
         await _respawner.ResetAsync(conn);
     }
-    
+
     public async Task ResetDatabaseAsync()
     {
         await using var conn = new NpgsqlConnection(_postgresqlContainer.GetConnectionString());
         await conn.OpenAsync();
         await _respawner.ResetAsync(conn);
     }
-    
+
     public async Task ResetCacheAsync()
     {
         var cacher = (FakeCacher)Services.GetRequiredService<ICacher>();
         await cacher.Reset();
     }
-    
+
     public async Task ResetBusAsync()
     {
         var bus = (FakeMessageBus)Services.GetRequiredService<IMessageBus>();

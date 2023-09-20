@@ -4,7 +4,7 @@ using AuthService.WebApi.Common.Result;
 using AuthService.WebApi.Common.Timestamp;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using Dapper;
-using ISession = AuthService.WebApi.Common.Auth.ISession;
+using ISession = AuthService.WebApi.Common.ISession;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
 
@@ -31,7 +31,7 @@ public class VerifyEmailHandler
 
     public async Task<Result> Handle(VerifyEmail req, CancellationToken ct = default)
     {
-        var accountId = _session.AccountId;
+        var accountId = _session.IdentityId;
 
         if (!accountId.HasValue)
         {

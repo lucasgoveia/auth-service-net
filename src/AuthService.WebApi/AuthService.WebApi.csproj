@@ -25,6 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Common\Auth\Requirements\" />
     <Folder Include="Database\" />
     <Folder Include="Modules\Profiles\UseCases\" />
   </ItemGroup>
