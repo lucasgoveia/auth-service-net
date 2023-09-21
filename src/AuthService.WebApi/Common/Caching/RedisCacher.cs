@@ -6,9 +6,11 @@ namespace AuthService.WebApi.Common.Caching;
 public class RedisCacher : ICacher
 {
     private readonly IDatabase _redisDb;
+    private readonly IConnectionMultiplexer _redis;
     
     public RedisCacher(IConnectionMultiplexer redisConnMultiplexer)
     {
+        _redis = redisConnMultiplexer;
         _redisDb = redisConnMultiplexer.GetDatabase();
     }
     
@@ -60,5 +62,18 @@ public class RedisCacher : ICacher
         var cacheResult = await Get<T>(key);
         await Remove(key);
         return cacheResult;
+    }
+
+    public async Task ClearPattern(string pattern)
+    {
+        foreach (var endpoint in _redis.GetEndPoints())
+        {
+            var server = _redis.GetServer(endpoint);
+            var keysToDelete = server.KeysAsync(pattern: pattern);
+            await foreach (var key in keysToDelete)
+            {
+                await _redisDb.KeyDeleteAsync(key);
+            }
+        }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Text.RegularExpressions;
 using AuthService.WebApi.Common.Caching;
 using AuthService.WebApi.Common.Timestamp;
 
@@ -100,6 +101,17 @@ public class FakeCacher : ICacher
         _cache.Remove(key);
 
         return Task.FromResult(JsonSerializer.Deserialize<T>(entry.Value));
+    }
+
+    public async Task ClearPattern(string pattern)
+    {
+        var patternRegex = new Regex(pattern.Replace("*", ".*"));
+        var keys = _cache.Keys.Where(x => patternRegex.IsMatch(x)).ToList();
+
+        foreach (var key in keys)
+        {
+            await Remove(key);
+        }
     }
 
     public Task Reset()

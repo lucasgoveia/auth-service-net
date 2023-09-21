@@ -2,7 +2,6 @@
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Common.Devices;
 using Microsoft.AspNetCore.Authorization;
-using ISession = AuthService.WebApi.Common.ISession;
 
 namespace AuthService.WebApi.Configurations;
 
@@ -16,7 +15,7 @@ public static class AuthConfiguration
         builder.Services.AddTransient<IIdentityDeviceRepository, IdentityDeviceRepository>();
         builder.Services.AddScoped<IDeviceIdentifier, DeviceIdentifier>();
 
-        builder.Services.AddTransient<ISession, Session>();
+        builder.Services.AddTransient<ISessionManager, SessionManagerManager>();
 
         builder.Services
             .AddAuthentication(CustomJwtAuthentication.Scheme)

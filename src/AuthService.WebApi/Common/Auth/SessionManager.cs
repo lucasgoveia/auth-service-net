@@ -1,19 +1,19 @@
 ﻿using System.Security.Claims;
 
-namespace AuthService.WebApi.Common;
+namespace AuthService.WebApi.Common.Auth;
 
-public interface ISession
+public interface ISessionManager
 {
     long? IdentityId { get; }
     bool IsAuthenticated { get; }
 }
 
-public class Session : ISession
+public class SessionManagerManager : ISessionManager
 {
     public long? IdentityId { get; init; }
     public bool IsAuthenticated => IdentityId.HasValue;
 
-    public Session(IHttpContextAccessor httpContextAccessor)
+    public SessionManagerManager(IHttpContextAccessor httpContextAccessor)
     {
         var user = httpContextAccessor.HttpContext?.User;
 

@@ -8,4 +8,5 @@ public interface ICacher
     Task Set<T>(string key, T data, TimeSpan? expiry = null);
     Task Remove(string key);
     Task<T?> GetAndRemove<T>(string key);
+    Task ClearPattern(string pattern);
 }

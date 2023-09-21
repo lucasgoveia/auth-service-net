@@ -95,9 +95,11 @@ public class CustomJwtAuthenticationHandler : AuthenticationHandler<CustomJwtAut
         {
             tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
 
-            if (!await _authenticationService.IsAccessTokenRevoked(token))
+            var jwtToken = (validatedToken as JwtSecurityToken)!;
+            
+            if (!await _authenticationService.IsAccessTokenRevoked(long.Parse(jwtToken.Subject), token))
             {
-                return (validatedToken as JwtSecurityToken, true);
+                return (jwtToken, true);
             }
 
             return (null, false);

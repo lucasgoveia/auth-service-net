@@ -1,9 +1,10 @@
 ﻿using System.Data;
+using AuthService.WebApi.Common;
+using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Common.Consts;
 using AuthService.WebApi.Common.Results;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using Dapper;
-using ISession = AuthService.WebApi.Common.ISession;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
 
@@ -16,19 +17,19 @@ public class InitiateEmailVerificationHandler
 {
     private readonly IEmailVerificationManager _emailVerificationManager;
     private readonly IIdentityEmailGetter _identityEmailGetter;
-    private readonly ISession _session;
+    private readonly ISessionManager _sessionManager;
 
-    public InitiateEmailVerificationHandler(IEmailVerificationManager emailVerificationManager, ISession session,
+    public InitiateEmailVerificationHandler(IEmailVerificationManager emailVerificationManager, ISessionManager sessionManager,
         IIdentityEmailGetter identityEmailGetter)
     {
         _emailVerificationManager = emailVerificationManager;
-        _session = session;
+        _sessionManager = sessionManager;
         _identityEmailGetter = identityEmailGetter;
     }
 
     public async Task<Result> Handle(InitiateEmailVerification req, CancellationToken ct = default)
     {
-        var identityId = _session.IdentityId;
+        var identityId = _sessionManager.IdentityId;
 
         if (!identityId.HasValue)
         {

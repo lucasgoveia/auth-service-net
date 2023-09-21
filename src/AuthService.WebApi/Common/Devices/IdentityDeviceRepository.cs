@@ -18,6 +18,7 @@ public interface IIdentityDeviceRepository
     public Task Add(IdentityDevice device);
     public Task Remove(string deviceFingerprint);
     Task<IdentityDevice?> Get(string deviceFingerprint);
+    Task RemoveIdentityDevices(long identityId);
 }
 
 public class IdentityDeviceRepository : IIdentityDeviceRepository
@@ -54,5 +55,12 @@ public class IdentityDeviceRepository : IIdentityDeviceRepository
         return _dbConnection.QuerySingleOrDefaultAsync<IdentityDevice?>(
             $"SELECT * FROM {TableNames.IdentityDevices} WHERE device_fingerprint = @deviceFingerprint;",
             new { deviceFingerprint });
+    }
+
+    public Task RemoveIdentityDevices(long identityId)
+    {
+        return _dbConnection.ExecuteAsync(
+            $"DELETE FROM {TableNames.IdentityDevices} WHERE identity_id = @identityId;",
+            new { identityId });
     }
 }

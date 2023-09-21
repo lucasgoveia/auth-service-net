@@ -46,7 +46,7 @@ public record Result<T>
 
         return this;
     }
-
+    
     public Result<TE> Map<TE>(Func<T, TE> mapper)
     {
         return Success

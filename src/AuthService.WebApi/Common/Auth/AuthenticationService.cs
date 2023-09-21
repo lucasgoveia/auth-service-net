@@ -21,7 +21,8 @@ public interface IAuthenticationService
     Task<string> Authenticate(long identityId, bool rememberMe, CancellationToken ct = default);
     Task LogOut(CancellationToken ct = default);
     Task<Result<string>> RefreshToken(CancellationToken ct = default);
-    Task<bool> IsAccessTokenRevoked(string accessToken, CancellationToken ct = default);
+    Task<bool> IsAccessTokenRevoked(long identityId, string accessToken, CancellationToken ct = default);
+    Task LogOutAllSessions(CancellationToken ct);
 }
 
 public record JwtConfig
@@ -70,12 +71,16 @@ public class AuthenticationService : IAuthenticationService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static string BuildRefreshTokenKey(string deviceId, string refreshToken) =>
-        $"accounts:sessions:{deviceId}:refresh-token:{refreshToken}";
+    private static string BuildRefreshTokenKey(long accountId, string deviceId, string refreshToken) =>
+        $"accounts:{accountId}:sessions:{deviceId}:refresh-token:{refreshToken}";
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static string BuildRevokedAccessTokenKey(string accessToken) =>
-        $"accounts:revoked-access-tokens:{accessToken}";
+    private static string BuildUserRefreshTokenPattern(long accountId, string deviceId, string refreshToken) =>
+        $"accounts:{accountId}:sessions:*";
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static string BuildRevokedAccessTokenKey(long accountId, string accessToken) =>
+        $"accounts:{accountId}:revoked-access-tokens:{accessToken}";
 
     public async Task<string> Authenticate(long identityId, bool rememberMe, CancellationToken ct = default)
     {
@@ -115,7 +120,7 @@ public class AuthenticationService : IAuthenticationService
         var refreshToken = GenerateRefreshToken(identityId, expiration);
 
         await _cacher.Set(
-            BuildRefreshTokenKey(deviceFingerprint, refreshToken),
+            BuildRefreshTokenKey(identityId, deviceFingerprint, refreshToken),
             new RefreshTokenInfo { TrustedDevice = trustedDevice, UsageCount = 0 },
             expiration
         );
@@ -158,19 +163,21 @@ public class AuthenticationService : IAuthenticationService
         var refreshToken = _httpContextAccessor.HttpContext!.Request.Cookies[RefreshTokenCookieName];
         var accessToken = _httpContextAccessor.HttpContext!.Request.Headers.Authorization.ToString().Split(" ")[1];
 
+        var identityId = GetIdentityIdFromToken(accessToken);
+
         if (!string.IsNullOrEmpty(refreshToken))
         {
-            await _cacher.Remove(BuildRefreshTokenKey(device.Fingerprint, refreshToken));
+            await _cacher.Remove(BuildRefreshTokenKey(identityId, device.Fingerprint, refreshToken));
             _httpContextAccessor.HttpContext!.Response.Cookies.Delete(RefreshTokenCookieName);
         }
 
         await _identityDeviceRepository.Remove(device.Fingerprint);
 
-        await _cacher.Set(BuildRevokedAccessTokenKey(accessToken), true,
+        await _cacher.Set(BuildRevokedAccessTokenKey(identityId, accessToken), true,
             TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
     }
 
-    public async Task<bool> AllowTokenRefresh(string deviceFingerprint, long identityId,
+    private async Task<bool> AllowTokenRefresh(string deviceFingerprint, long identityId,
         RefreshTokenInfo? refreshTokenInfo)
     {
         var storedDevice = await _identityDeviceRepository.Get(deviceFingerprint);
@@ -203,14 +210,16 @@ public class AuthenticationService : IAuthenticationService
             return ErrorResult.Unauthorized();
         }
 
-        var (info, expiry) =
-            await _cacher.GetWithExpiration<RefreshTokenInfo>(BuildRefreshTokenKey(device.Fingerprint, refreshToken));
-
         var identityId = GetIdentityIdFromToken(refreshToken);
+
+        var (info, expiry) =
+            await _cacher.GetWithExpiration<RefreshTokenInfo>(BuildRefreshTokenKey(identityId, device.Fingerprint,
+                refreshToken));
+
 
         if (!await AllowTokenRefresh(device.Fingerprint, identityId, info))
         {
-            await RemoveRefreshToken(device, refreshToken);
+            await RemoveRefreshToken(identityId, device.Fingerprint, refreshToken);
             return ErrorResult.Unauthorized();
         }
 
@@ -225,22 +234,32 @@ public class AuthenticationService : IAuthenticationService
             return SuccessResult.Success(GenerateAccessTokenFromRefreshToken(refreshToken));
         }
 
-        await _cacher.Set(BuildRefreshTokenKey(device.Fingerprint, refreshToken),
+        await _cacher.Set(BuildRefreshTokenKey(identityId, device.Fingerprint, refreshToken),
             info with { UsageCount = info.UsageCount + 1 },
             expiry);
 
         return SuccessResult.Success(GenerateAccessTokenFromRefreshToken(refreshToken));
     }
 
-    private async Task RemoveRefreshToken(DeviceDto device, string refreshToken)
+    private async Task RemoveRefreshToken(long identityId, string deviceFingerprint, string refreshToken)
     {
         _httpContextAccessor.HttpContext!.Response.Cookies.Delete(RefreshTokenCookieName);
-        await _cacher.Remove(BuildRefreshTokenKey(device.Fingerprint, refreshToken));
+        await _cacher.Remove(BuildRefreshTokenKey(identityId, deviceFingerprint, refreshToken));
     }
 
-    public async Task<bool> IsAccessTokenRevoked(string accessToken, CancellationToken ct = default)
+    public async Task<bool> IsAccessTokenRevoked(long identityId, string accessToken, CancellationToken ct = default)
     {
-        return await _cacher.Get<bool?>(BuildRevokedAccessTokenKey(accessToken)) ?? false;
+        return await _cacher.Get<bool?>(BuildRevokedAccessTokenKey(identityId, accessToken)) ?? false;
+    }
+
+    public async Task LogOutAllSessions(CancellationToken ct)
+    {
+        var device = _deviceIdentifier.Identify();
+        var refreshToken = _httpContextAccessor.HttpContext!.Request.Cookies[RefreshTokenCookieName]!;
+        var identityId = GetIdentityIdFromToken(refreshToken);
+
+        await _identityDeviceRepository.RemoveIdentityDevices(identityId);
+        await _cacher.ClearPattern(BuildUserRefreshTokenPattern(identityId, device.Fingerprint, refreshToken));
     }
 
     private string GenerateRefreshToken(long identityId, TimeSpan lifetime)

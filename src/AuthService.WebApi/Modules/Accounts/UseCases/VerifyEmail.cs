@@ -1,11 +1,12 @@
 ﻿using System.Data;
+using AuthService.WebApi.Common;
+using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Common.Consts;
 using AuthService.WebApi.Common.Results;
 using AuthService.WebApi.Common.Timestamp;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using Dapper;
 using FluentValidation;
-using ISession = AuthService.WebApi.Common.ISession;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
 
@@ -28,21 +29,21 @@ public class VerifyEmailHandler
 {
     private readonly IEmailVerificationManager _emailVerificationManager;
     private readonly UtcNow _utcNow;
-    private readonly ISession _session;
+    private readonly ISessionManager _sessionManager;
     private readonly IAccountEmailVerifiedSetter _accountEmailVerifiedSetter;
 
-    public VerifyEmailHandler(IEmailVerificationManager emailVerificationManager, UtcNow utcNow, ISession session,
+    public VerifyEmailHandler(IEmailVerificationManager emailVerificationManager, UtcNow utcNow, ISessionManager sessionManager,
         IAccountEmailVerifiedSetter accountEmailVerifiedSetter)
     {
         _emailVerificationManager = emailVerificationManager;
         _utcNow = utcNow;
-        _session = session;
+        _sessionManager = sessionManager;
         _accountEmailVerifiedSetter = accountEmailVerifiedSetter;
     }
 
     public async Task<Result> Handle(VerifyEmail req, CancellationToken ct = default)
     {
-        var accountId = _session.IdentityId;
+        var accountId = _sessionManager.IdentityId;
 
         if (!accountId.HasValue)
         {

@@ -1,10 +1,10 @@
 ﻿using System.Data;
+using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Common.Consts;
 using AuthService.WebApi.Common.Results;
 using AuthService.WebApi.Common.Security;
 using Dapper;
 using FluentValidation;
-using ISession = AuthService.WebApi.Common.ISession;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
 
@@ -12,6 +12,7 @@ public record ChangePassword
 {
     public required string CurrentPassword { get; init; }
     public required string NewPassword { get; init; }
+    public required bool LogOutAllSessions { get; init; }
 }
 
 public class ChangePasswordValidator : AbstractValidator<ChangePassword>
@@ -30,23 +31,46 @@ public class ChangePasswordValidator : AbstractValidator<ChangePassword>
     }
 }
 
+public record ChangePasswordResponse
+{
+    public required string AccessToken { get; init; }
+}
+
 public class ChangePasswordHandler
 {
     private readonly IIdentityPasswordChanger _identityPasswordChanger;
-    private readonly ISession _session;
+    private readonly ISessionManager _sessionManager;
+    private readonly IAuthenticationService _authenticationService;
 
-    public ChangePasswordHandler(IIdentityPasswordChanger identityPasswordChanger, ISession session)
+    public ChangePasswordHandler(IIdentityPasswordChanger identityPasswordChanger, ISessionManager sessionManager,
+        IAuthenticationService authenticationService)
     {
         _identityPasswordChanger = identityPasswordChanger;
-        _session = session;
+        _sessionManager = sessionManager;
+        _authenticationService = authenticationService;
     }
 
-    public async Task<Result> Handle(ChangePassword req, CancellationToken ct)
+    public async Task<Result<ChangePasswordResponse>> Handle(ChangePassword req, CancellationToken ct)
     {
-        // TODO: Add option for logging out of all sessions
-        // TODO: Issue new access and refresh tokens
-        return await _identityPasswordChanger.ChangePassword(_session.IdentityId!.Value, req.CurrentPassword,
-            req.NewPassword, ct);
+        var changePasswordResult = await _identityPasswordChanger.ChangePassword(_sessionManager.IdentityId!.Value,
+            req.CurrentPassword, req.NewPassword, ct);
+
+        if (changePasswordResult.Success)
+        {
+            if (req.LogOutAllSessions)
+            {
+                await _authenticationService.LogOutAllSessions(ct);
+            }
+
+            var accessToken = await _authenticationService.Authenticate(_sessionManager.IdentityId!.Value, true, ct);
+
+            return SuccessResult.Success(new ChangePasswordResponse
+            {
+                AccessToken = accessToken
+            });
+        }
+
+        return changePasswordResult.AsError()!;
     }
 }
 
