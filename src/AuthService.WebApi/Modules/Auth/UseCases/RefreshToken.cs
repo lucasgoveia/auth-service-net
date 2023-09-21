@@ -1,7 +1,12 @@
 ﻿using AuthService.WebApi.Common.Auth;
-using AuthService.WebApi.Common.Result;
+using AuthService.WebApi.Common.Results;
 
 namespace AuthService.WebApi.Modules.Auth.UseCases;
+
+public record RefreshToken
+{
+    public static RefreshToken Instance { get; } = new();
+}
 
 public record RefreshTokenResponse
 {
@@ -17,7 +22,7 @@ public class RefreshTokenHandler
         _authenticationService = authenticationService;
     }
 
-    public async Task<Result<RefreshTokenResponse>> Handle(CancellationToken ct = default)
+    public async Task<Result<RefreshTokenResponse>> Handle(RefreshToken req, CancellationToken ct = default)
     {
         return (await _authenticationService.RefreshToken(ct))
             .Map(accessToken => new RefreshTokenResponse { AccessToken = accessToken });

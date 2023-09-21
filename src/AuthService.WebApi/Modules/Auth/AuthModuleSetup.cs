@@ -1,4 +1,5 @@
-﻿using AuthService.WebApi.Common.Result;
+﻿using AuthService.WebApi.Common;
+using AuthService.WebApi.Common.Results;
 using AuthService.WebApi.Modules.Auth.UseCases;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,19 +19,23 @@ public static class AuthModuleSetup
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder builder)
     {
         builder.MapPost("login",
-                async ([FromBody] Login req, [FromServices] LoginHandler handler,
-                    CancellationToken ct) => (await handler.Handle(req, ct)).ToApiResult())
+                async ([FromBody] Login req, [FromServices] LoginHandler handler, [FromServices] RequestPipe pipe,
+                    CancellationToken ct) => (await pipe.Pipe(req, handler.Handle, ct)).ToApiResult()
+            )
             .AllowAnonymous();
 
         builder.MapPost("token",
-                async ([FromServices] RefreshTokenHandler handler,
-                    CancellationToken ct) => (await handler.Handle(ct)).ToApiResult())
+                async ([FromServices] RefreshTokenHandler handler, [FromServices] RequestPipe pipe,
+                        CancellationToken ct) =>
+                    (await pipe.Pipe(RefreshToken.Instance, handler.Handle, ct)).ToApiResult()
+            )
             .AllowAnonymous();
 
         builder.MapPost("logout",
-            async ([FromServices] LogOutHandler handler,
-                CancellationToken ct) => (await handler.Handle(ct)).ToApiResult())
-            .RequireAuthorization();;
+                async ([FromServices] LogOutHandler handler, [FromServices] RequestPipe pipe,
+                    CancellationToken ct) => (await pipe.Pipe(LogOut.Instance, handler.Handle, ct)).ToApiResult()
+            )
+            .RequireAuthorization();
 
         return builder;
     }

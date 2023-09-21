@@ -1,4 +1,5 @@
-﻿using AuthService.WebApi.Common.Result;
+﻿using AuthService.WebApi.Common;
+using AuthService.WebApi.Common.Results;
 using AuthService.WebApi.Common.Security;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using AuthService.WebApi.Modules.Accounts.UseCases;
@@ -13,20 +14,23 @@ public static class AccountsModuleSetup
         services.AddScoped<IUsernameAvailabilityChecker, UsernameAvailabilityChecker>();
 
         services.AddSingleton<IPasswordPolicy, PasswordPolicy>();
-        
-        services.AddScoped<RegisterAccountHandler>();
-        services.AddScoped<VerifyEmailHandler>();
-        services.AddScoped<InitiateEmailVerificationHandler>();
-        
-        services.AddScoped<INewAccountSaver, NewAccountSaver>();
-        
-        services.AddTransient<IEmailVerificationCodeGenerator, EmailVerificationCodeGenerator>();
-        services.AddTransient<IEmailVerificationCodeSender, EmailVerificationCodeSender>();
-        services.AddTransient<IEmailVerificationCodeRepository, EmailVerificationCodeRepository>();
-        services.AddTransient<IEmailVerificationManager, EmailVerificationManager>();
-        services.AddTransient<IAccountEmailVerifiedSetter, AccountEmailVerifiedSetter>();
 
-        services.AddTransient<IIdentityEmailGetter, IdentityEmailGetter>();
+        services.AddScoped<RegisterAccountHandler>();
+        services.AddScoped<InitiateEmailVerificationHandler>();
+        services.AddScoped<VerifyEmailHandler>();
+        services.AddScoped<ChangePasswordHandler>();
+
+        services.AddScoped<INewAccountSaver, NewAccountSaver>();
+
+        services.AddScoped<IEmailVerificationCodeGenerator, EmailVerificationCodeGenerator>();
+        services.AddScoped<IEmailVerificationCodeSender, EmailVerificationCodeSender>();
+        services.AddScoped<IEmailVerificationCodeRepository, EmailVerificationCodeRepository>();
+        services.AddScoped<IEmailVerificationManager, EmailVerificationManager>();
+        services.AddScoped<IAccountEmailVerifiedSetter, AccountEmailVerifiedSetter>();
+
+        services.AddScoped<IIdentityEmailGetter, IdentityEmailGetter>();
+
+        services.AddScoped<IIdentityPasswordChanger, IdentityPasswordChanger>();
 
         return services;
     }
@@ -35,17 +39,29 @@ public static class AccountsModuleSetup
     {
         builder.MapPost("accounts/register",
                 async ([FromBody] RegisterAccount req, [FromServices] RegisterAccountHandler handler,
-                    CancellationToken ct) => (await handler.Handle(req, ct)).ToApiResult())
+                        [FromServices] RequestPipe pipe, CancellationToken ct) =>
+                    (await pipe.Pipe(req, handler.Handle, ct)).ToApiResult()
+            )
             .AllowAnonymous();
 
         builder.MapPost("accounts/verify-email",
                 async ([FromBody] VerifyEmail req, [FromServices] VerifyEmailHandler handler,
-                    CancellationToken ct) => (await handler.Handle(req, ct)).ToApiResult())
+                        [FromServices] RequestPipe pipe, CancellationToken ct) =>
+                    (await pipe.Pipe(req, handler.Handle, ct)).ToApiResult()
+            )
             .RequireAuthorization();
-        
+
         builder.MapPost("accounts/initiate-email-verification",
-                async ([FromServices] InitiateEmailVerificationHandler handler,
-                    CancellationToken ct) => (await handler.Handle(ct)).ToApiResult())
+                async ([FromServices] InitiateEmailVerificationHandler handler, [FromServices] RequestPipe pipe,
+                        CancellationToken ct) =>
+                    (await pipe.Pipe(InitiateEmailVerification.Instance, handler.Handle, ct)).ToApiResult()
+            )
+            .RequireAuthorization();
+
+        builder.MapPost("accounts/change-password", async ([FromServices] ChangePasswordHandler handler,
+                    [FromServices] RequestPipe pipe, [FromBody] ChangePassword req, CancellationToken ct) =>
+                (await pipe.Pipe(req, handler.Handle, ct)).ToApiResult()
+            )
             .RequireAuthorization();
 
         return builder;

@@ -1,11 +1,16 @@
 ﻿using System.Data;
 using AuthService.WebApi.Common.Consts;
-using AuthService.WebApi.Common.Result;
+using AuthService.WebApi.Common.Results;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using Dapper;
 using ISession = AuthService.WebApi.Common.ISession;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
+
+public record InitiateEmailVerification
+{
+    public static readonly InitiateEmailVerification Instance = new();
+}
 
 public class InitiateEmailVerificationHandler
 {
@@ -21,7 +26,7 @@ public class InitiateEmailVerificationHandler
         _identityEmailGetter = identityEmailGetter;
     }
 
-    public async Task<Result> Handle(CancellationToken ct = default)
+    public async Task<Result> Handle(InitiateEmailVerification req, CancellationToken ct = default)
     {
         var identityId = _session.IdentityId;
 

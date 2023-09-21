@@ -1,6 +1,6 @@
 ﻿using FluentValidation.Results;
 
-namespace AuthService.WebApi.Common.Result;
+namespace AuthService.WebApi.Common.Results;
 
 public static class FluentValidationExtensions
 {

@@ -105,6 +105,7 @@ public class EmailVerificationCodeSender : IEmailVerificationCodeSender
 
 public interface IEmailVerificationCodeGenerator
 {
+    public const int CodeLength = 6;
     string Generate();
 }
 
@@ -114,7 +115,7 @@ public class EmailVerificationCodeGenerator : IEmailVerificationCodeGenerator
     
     public string Generate()
     {
-        var randomChars = Enumerable.Range(0,6)
+        var randomChars = Enumerable.Range(0, IEmailVerificationCodeGenerator.CodeLength)
             .Select(_ => RandomNumberGenerator.GetInt32(0, _alphabet.Length))
             .Select(i => _alphabet[i])
             .ToArray();

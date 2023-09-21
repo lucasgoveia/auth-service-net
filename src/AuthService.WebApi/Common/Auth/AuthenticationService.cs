@@ -6,7 +6,7 @@ using System.Text;
 using AuthService.WebApi.Common.Caching;
 using AuthService.WebApi.Common.Consts;
 using AuthService.WebApi.Common.Devices;
-using AuthService.WebApi.Common.Result;
+using AuthService.WebApi.Common.Results;
 using AuthService.WebApi.Common.Security;
 using AuthService.WebApi.Common.Timestamp;
 using Dapper;
@@ -119,7 +119,7 @@ public class AuthenticationService : IAuthenticationService
             new RefreshTokenInfo { TrustedDevice = trustedDevice, UsageCount = 0 },
             expiration
         );
-        
+
         _httpContextAccessor.HttpContext!.Response.Cookies.Append(RefreshTokenCookieName, refreshToken,
             new CookieOptions
             {
@@ -192,7 +192,7 @@ public class AuthenticationService : IAuthenticationService
 
         return true;
     }
-    
+
     public async Task<Result<string>> RefreshToken(CancellationToken ct = default)
     {
         var device = _deviceIdentifier.Identify();
@@ -219,9 +219,9 @@ public class AuthenticationService : IAuthenticationService
             var newExpiration = info.TrustedDevice
                 ? TimeSpan.FromHours(_jwtConfig.RefreshTokenInTrustedDevicesHoursLifetime)
                 : expiry.GetValueOrDefault();
-            
+
             await GenerateAndSetRefreshToken(true, identityId, device.Fingerprint, newExpiration);
-            
+
             return SuccessResult.Success(GenerateAccessTokenFromRefreshToken(refreshToken));
         }
 
@@ -303,6 +303,7 @@ public record IdentityForLogin
 public interface IIdentityForLoginGetter
 {
     Task<IdentityForLogin?> Get(string username, CancellationToken ct = default);
+    Task<IdentityForLogin?> Get(long identityId, CancellationToken ct = default);
 }
 
 public class IdentityForLoginGetter : IIdentityForLoginGetter
@@ -314,10 +315,17 @@ public class IdentityForLoginGetter : IIdentityForLoginGetter
         _dbConnection = dbConnection;
     }
 
-    public Task<IdentityForLogin?> Get(string username, CancellationToken ct = default)
+    public async Task<IdentityForLogin?> Get(string username, CancellationToken ct = default)
     {
-        return _dbConnection.QuerySingleOrDefaultAsync<IdentityForLogin?>(
+        return await _dbConnection.QuerySingleOrDefaultAsync<IdentityForLogin?>(
             $"SELECT id, password_hash FROM {TableNames.Identities} WHERE LOWER(username) = @Username",
             new { Username = username.ToLower() });
+    }
+
+    public async Task<IdentityForLogin?> Get(long identityId, CancellationToken ct = default)
+    {
+        return await _dbConnection.QuerySingleOrDefaultAsync<IdentityForLogin?>(
+            $"SELECT id, password_hash FROM {TableNames.Identities} WHERE id = @identityId",
+            new { identityId });
     }
 }

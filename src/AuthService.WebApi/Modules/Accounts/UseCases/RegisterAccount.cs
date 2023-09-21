@@ -2,7 +2,7 @@
 using AuthService.WebApi.Common;
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Common.Consts;
-using AuthService.WebApi.Common.Result;
+using AuthService.WebApi.Common.Results;
 using AuthService.WebApi.Common.Security;
 using AuthService.WebApi.Common.Timestamp;
 using AuthService.WebApi.Modules.Accounts.Functionality;
@@ -47,31 +47,21 @@ public sealed class RegisterAccountHandler
     private readonly IPasswordHasher _passwordHasher;
     private readonly IEmailVerificationManager _emailVerificationManager;
     private readonly GenerateId _generateId;
-    private readonly IValidator<RegisterAccount> _validator;
     private readonly IAuthenticationService _authenticationService;
 
     public RegisterAccountHandler(INewAccountSaver saver, UtcNow utcNow, IPasswordHasher passwordHasher,
-        IEmailVerificationManager emailVerificationManager, GenerateId generateId,
-        IValidator<RegisterAccount> validator, IAuthenticationService authenticationService)
+        IEmailVerificationManager emailVerificationManager, GenerateId generateId, IAuthenticationService authenticationService)
     {
         _saver = saver;
         _utcNow = utcNow;
         _passwordHasher = passwordHasher;
         _emailVerificationManager = emailVerificationManager;
         _generateId = generateId;
-        _validator = validator;
         _authenticationService = authenticationService;
     }
 
     public async Task<Result<RegisterAccountResponse>> Handle(RegisterAccount req, CancellationToken ct = default)
     {
-        var validationResult = await _validator.ValidateAsync(req, ct);
-
-        if (!validationResult.IsValid)
-        {
-            return validationResult.ToErrorResult();
-        }
-
         var hashedPassword = _passwordHasher.Hash(req.Password);
         var identityId = await _generateId();
         var account = Identity.CreateNewIdentity(identityId, req.Email, hashedPassword, req.Email, _utcNow());

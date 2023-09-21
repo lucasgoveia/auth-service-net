@@ -1,7 +1,12 @@
 ﻿using AuthService.WebApi.Common.Auth;
-using AuthService.WebApi.Common.Result;
+using AuthService.WebApi.Common.Results;
 
 namespace AuthService.WebApi.Modules.Auth.UseCases;
+
+public record LogOut
+{
+    public static LogOut Instance { get; } = new();
+}
 
 public class LogOutHandler
 {
@@ -12,7 +17,7 @@ public class LogOutHandler
         _authenticationService = authenticationService;
     }
 
-    public async Task<Result> Handle(CancellationToken ct = default)
+    public async Task<Result> Handle(LogOut req, CancellationToken ct = default)
     {
         await _authenticationService.LogOut(ct);
         return SuccessResult.Success();

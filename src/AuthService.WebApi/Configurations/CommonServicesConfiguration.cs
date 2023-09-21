@@ -21,5 +21,7 @@ public static class CommonServicesConfiguration
             () => Task.FromResult(sp.GetRequiredService<IdGenerator>().CreateId()));
 
         builder.Services.AddSingleton<UtcNow>(_ => TimestampUtils.UtcNow);
+
+        builder.Services.AddScoped<RequestPipe>();
     }
 }
