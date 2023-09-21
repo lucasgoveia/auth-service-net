@@ -38,7 +38,6 @@ public class VerifyEmailTests : TestBase, IClassFixture<IntegrationTestFactory>
 
         var sendEmailVerification = ((FakeMessageBus)MessageBus)!.Messages.Cast<SendEmailVerification>().First();
         _code = sendEmailVerification.Code;
-        Console.WriteLine(_code);
     }
 
     [Fact]
