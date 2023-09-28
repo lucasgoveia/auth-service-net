@@ -76,7 +76,6 @@ public class CustomJwtAuthenticationHandler : AuthenticationHandler<CustomJwtAut
 
     private async Task<(JwtSecurityToken?, bool)> ValidateToken(string token)
     {
-        IdentityModelEventSource.ShowPII = true;
         var publicKeyBytes = Convert.FromBase64String(_jwtConfig.AccessTokenPublicKey);
         using var rsa = RSA.Create(4096);
         rsa.ImportRSAPublicKey(publicKeyBytes, out _);
