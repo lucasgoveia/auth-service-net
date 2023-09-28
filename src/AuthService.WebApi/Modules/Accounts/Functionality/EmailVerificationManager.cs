@@ -1,48 +1,46 @@
 ﻿using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
-using AuthService.WebApi.Common.Caching;
-using AuthService.WebApi.Common.Messaging;
-using AuthService.WebApi.Common.Security;
+using AuthService.Common.Caching;
+using AuthService.Common.Messaging;
+using AuthService.Common.Security;
 using AuthService.WebApi.Messages.Commands;
-using MassTransit;
 
 namespace AuthService.WebApi.Modules.Accounts.Functionality;
 
 public interface IEmailVerificationManager
 {
-    Task SendCode(long accountId, string email);
-    Task<bool> Verify(long accountId, string code);
+    Task SendCode(long userId, string email);
+    Task<bool> Verify(long userId, string code);
+    Task RevokeCode(long userId);
 }
 
 public class EmailVerificationManager : IEmailVerificationManager
 {
-    private readonly IEmailVerificationCodeGenerator _codeGenerator;
-    private readonly IEmailVerificationCodeSender _codeSender;
     private readonly IEmailVerificationCodeRepository _codeRepository;
     private readonly IPasswordHasher _hasher;
+    private readonly IMessageBus _bus;
+    private readonly IOtpGenerator _otpGenerator;
 
-    public EmailVerificationManager(IEmailVerificationCodeGenerator codeGenerator,
-        IEmailVerificationCodeSender codeSender, IEmailVerificationCodeRepository codeRepository,
-        IPasswordHasher hasher)
+    public EmailVerificationManager(IEmailVerificationCodeRepository codeRepository,
+        IPasswordHasher hasher, IMessageBus bus, IOtpGenerator otpGenerator)
     {
-        _codeGenerator = codeGenerator;
-        _codeSender = codeSender;
         _codeRepository = codeRepository;
         _hasher = hasher;
+        _bus = bus;
+        _otpGenerator = otpGenerator;
     }
 
-    public async Task SendCode(long accountId, string email)
+    public async Task SendCode(long userId, string email)
     {
-        var code = _codeGenerator.Generate();
+        var code = _otpGenerator.Generate();
         var hashedCode = _hasher.Hash(code);
-        await _codeSender.Send(email, code);
-        await _codeRepository.Save(accountId, hashedCode);
+        await _bus.Publish(new SendEmailVerification { Code = code, Email = email });
+        await _codeRepository.Save(userId, hashedCode);
     }
 
 
-    public async Task<bool> Verify(long accountId, string code)
+    public async Task<bool> Verify(long userId, string code)
     {
-        var savedHashedCode = await _codeRepository.Get(accountId);
+        var savedHashedCode = await _codeRepository.Get(userId);
 
         if (savedHashedCode is null)
         {
@@ -51,12 +49,18 @@ public class EmailVerificationManager : IEmailVerificationManager
 
         return _hasher.Verify(code, savedHashedCode);
     }
+
+    public Task RevokeCode(long userId)
+    {
+        return _codeRepository.Remove(userId);
+    }
 }
 
 public interface IEmailVerificationCodeRepository
 {
     Task Save(long accountId, string hashedCode);
     Task<string?> Get(long accountId);
+    Task Remove(long accountId);
 }
 
 public class EmailVerificationCodeRepository : IEmailVerificationCodeRepository
@@ -81,45 +85,9 @@ public class EmailVerificationCodeRepository : IEmailVerificationCodeRepository
     {
         return await _cacher.Get<string>(BuildKey(accountId));
     }
-}
 
-public interface IEmailVerificationCodeSender
-{
-    Task Send(string email, string code, CancellationToken ct = default);
-}
-
-public class EmailVerificationCodeSender : IEmailVerificationCodeSender
-{
-    private readonly IMessageBus _bus;
-
-    public EmailVerificationCodeSender(IMessageBus bus)
+    public Task Remove(long accountId)
     {
-        _bus = bus;
-    }
-
-    public async Task Send(string email, string code, CancellationToken ct = default)
-    {
-        await _bus.Publish(new SendEmailVerification { Code = code, Email = email }, ct);
-    }
-}
-
-public interface IEmailVerificationCodeGenerator
-{
-    public const int CodeLength = 6;
-    string Generate();
-}
-
-public class EmailVerificationCodeGenerator : IEmailVerificationCodeGenerator
-{
-    private readonly char[] _alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".ToCharArray();
-    
-    public string Generate()
-    {
-        var randomChars = Enumerable.Range(0, IEmailVerificationCodeGenerator.CodeLength)
-            .Select(_ => RandomNumberGenerator.GetInt32(0, _alphabet.Length))
-            .Select(i => _alphabet[i])
-            .ToArray();
-
-        return new string(randomChars);
+        return _cacher.Remove(BuildKey(accountId));
     }
 }

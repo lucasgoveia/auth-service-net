@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using AuthService.WebApi.Messages.Commands;
 using AuthService.WebApi.Modules.Accounts.UseCases;
+using AuthService.WebApi.Modules.Auth.UseCases;
 using AuthService.WebApi.Tests.Fakes;
 using FluentAssertions;
 
@@ -26,8 +27,16 @@ public class InitiateEmailVerificationTests : TestBase, IClassFixture<Integratio
         };
 
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
-
-        var accessToken = (await res.Content.ReadFromJsonAsync<RegisterAccountResponse>())!.AccessToken;
+        res.EnsureSuccessStatusCode();
+        
+        res = await Client.PostAsJsonAsync("/login", new Login
+        {
+            Password = registerAccountRequest.Password,
+            Username = registerAccountRequest.Email,
+            RememberMe = true,
+        });
+        
+        var accessToken = (await res.Content.ReadFromJsonAsync<LoginResponse>())!.AccessToken;
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         await ((FakeMessageBus)MessageBus).Reset();

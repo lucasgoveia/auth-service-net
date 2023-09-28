@@ -1,5 +1,7 @@
-﻿using AuthService.Consumers.CommandHandlers;
-using AuthService.WebApi.Common.Messaging;
+﻿using AuthService.Common.Messaging;
+using AuthService.Consumers.CommandHandlers;
+using AuthService.Consumers.EventHandlers;
+using AuthService.WebApi.Messages.Commands;
 using MassTransit;
 
 namespace AuthService.WebApi.Configurations;
@@ -14,6 +16,10 @@ public static class BusConfiguration
             bus.SetKebabCaseEndpointNameFormatter();
 
             bus.AddConsumer<SendEmailVerificationConsumer>();
+            bus.AddConsumer<SendPasswordRecoveryConsumer>();
+            
+            bus.AddConsumer<LoginAttemptFailedConsumer>();
+            bus.AddConsumer<LoginAttemptSucceedConsumer>();
 
             bus.UsingAmazonSqs((context, cfg) =>
             {

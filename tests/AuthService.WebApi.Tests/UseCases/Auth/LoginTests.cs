@@ -19,20 +19,20 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
     {
         await base.Seed();
 
-        var registerAccountRequest = new RegisterAccount
+        var req = new RegisterAccount
         {
             Email = TestEmail,
             Password = TestPassword,
         };
 
-        await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
+        await Client.PostAsJsonAsync("/accounts/register", req);
     }
 
     [Fact]
     public async Task Login_with_valid_credentials_should_be_success()
     {
         // Arrange
-        var registerAccountRequest = new Login
+        var loginReq = new Login
         {
             Username = TestEmail,
             Password = TestPassword,
@@ -40,7 +40,7 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
         };
 
         // Act
-        var res = await Client.PostAsJsonAsync("/login", registerAccountRequest);
+        var res = await Client.PostAsJsonAsync("/login", loginReq);
 
         // Assert
         res.Should().BeSuccessful();
@@ -50,7 +50,7 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task Login_with_valid_credentials_should_return_access_token()
     {
         // Arrange
-        var registerAccountRequest = new Login
+        var loginReq = new Login
         {
             Username = TestEmail,
             Password = TestPassword,
@@ -58,7 +58,7 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
         };
 
         // Act
-        var res = await Client.PostAsJsonAsync("/login", registerAccountRequest);
+        var res = await Client.PostAsJsonAsync("/login", loginReq);
 
         // Assert
         var resBody = await res.Content.ReadFromJsonAsync<LoginResponse>();
@@ -69,7 +69,7 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task Login_with_invalid_password_should_return_unauthorized()
     {
         // Arrange
-        var registerAccountRequest = new Login
+        var loginReq = new Login
         {
             Username = TestEmail,
             Password = "INVALID_PASSWORD",
@@ -77,7 +77,7 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
         };
 
         // Act
-        var res = await Client.PostAsJsonAsync("/login", registerAccountRequest);
+        var res = await Client.PostAsJsonAsync("/login", loginReq);
 
         // Assert
         res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -87,7 +87,7 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task Login_with_not_existing_username_should_return_unauthorized()
     {
         // Arrange
-        var registerAccountRequest = new Login
+        var loginReq = new Login
         {
             Username = "some_other_email@example.com",
             Password = TestPassword,
@@ -95,7 +95,93 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
         };
 
         // Act
-        var res = await Client.PostAsJsonAsync("/login", registerAccountRequest);
+        var res = await Client.PostAsJsonAsync("/login", loginReq);
+
+        // Assert
+        res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+    
+    [Fact]
+    public async Task Login_3_times_with_invalid_password_should_lockout_account()
+    {
+        // Arrange
+        var loginReq = new Login
+        {
+            Username = TestEmail,
+            Password = "WRONG_PASSWORD",
+            RememberMe = false,
+        };
+            
+        for (int _ = 0; _ < 3; _++)
+        {
+            
+            await Client.PostAsJsonAsync("/login", loginReq);
+        }
+
+        loginReq = loginReq with { Password = TestPassword };
+        
+        // Act
+        var res = await Client.PostAsJsonAsync("/login", loginReq);
+
+        // Assert
+        res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+    
+    [Fact]
+    public async Task Login_should_allow_after_lockout_end()
+    {
+        // Arrange
+        var loginReq = new Login
+        {
+            Username = TestEmail,
+            Password = "WRONG_PASSWORD",
+            RememberMe = false,
+        };
+            
+        for (int _ = 0; _ < 3; _++)
+        {
+            
+            await Client.PostAsJsonAsync("/login", loginReq);
+        }
+
+        DateTimeHolder.MockedUtcNow = DateTimeHolder.MockedUtcNow.AddMinutes(6);
+
+        loginReq = loginReq with { Password = TestPassword };
+        
+        // Act
+        var res = await Client.PostAsJsonAsync("/login", loginReq);
+
+        // Assert
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+    
+    [Fact]
+    public async Task Login_lockout_should_increment_with_failed_attempts()
+    {
+        // Arrange
+        var loginReq = new Login
+        {
+            Username = TestEmail,
+            Password = "WRONG_PASSWORD",
+            RememberMe = false,
+        };
+            
+        for (int _ = 0; _ < 3; _++)
+        {
+            
+            await Client.PostAsJsonAsync("/login", loginReq);
+        }
+
+        DateTimeHolder.MockedUtcNow = DateTimeHolder.MockedUtcNow.AddMinutes(6);
+
+        await Client.PostAsJsonAsync("/login", loginReq);;
+        
+        loginReq = loginReq with { Password = TestPassword };
+        
+        DateTimeHolder.MockedUtcNow = DateTimeHolder.MockedUtcNow.AddMinutes(6);
+        
+        // Act
+        var res = await Client.PostAsJsonAsync("/login", loginReq);
 
         // Assert
         res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);

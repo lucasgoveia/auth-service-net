@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using AngleSharp.Io;
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Modules.Accounts.UseCases;
+using AuthService.WebApi.Modules.Auth.UseCases;
 using AuthService.WebApi.Tests.Utils;
 using FluentAssertions;
 
@@ -29,9 +30,17 @@ public class LogOutTests : TestBase, IClassFixture<IntegrationTestFactory>
         };
 
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
-
+        res.EnsureSuccessStatusCode();
+        
+        res = await Client.PostAsJsonAsync("/login", new Login
+        {
+            Password = registerAccountRequest.Password,
+            Username = registerAccountRequest.Email,
+            RememberMe = true,
+        });
+        
+        _accessToken = (await res.Content.ReadFromJsonAsync<LoginResponse>())!.AccessToken;
         _cookies = res.Headers.GetValues(HeaderNames.SetCookie).ToArray();
-        _accessToken = (await res.Content.ReadFromJsonAsync<RegisterAccountResponse>())!.AccessToken;
 
         Client.DefaultRequestHeaders.Add("Cookie", _cookies);
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
@@ -84,7 +93,7 @@ public class LogOutTests : TestBase, IClassFixture<IntegrationTestFactory>
         res.GetCookies()
             .Should()
             .Contain(x =>
-                x.Name == AuthenticationService.RefreshTokenCookieName && x.Expires < DateTimeHolder.MockedUtcNow &&
+                x.Name == AuthCookieNames.RefreshTokenCookieName && x.Expires < DateTimeHolder.MockedUtcNow &&
                 x.Value == string.Empty);
     }
 }

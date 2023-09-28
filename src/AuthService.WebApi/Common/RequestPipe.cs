@@ -1,4 +1,5 @@
-﻿using AuthService.WebApi.Common.Results;
+﻿using AuthService.Common.Results;
+using AuthService.WebApi.Common.ResultExtensions;
 using FluentValidation;
 
 namespace AuthService.WebApi.Common;
@@ -11,8 +12,9 @@ public class RequestPipe
     {
         _serviceProvider = serviceProvider;
     }
-    
-    public async Task<Result<TResponse>> Pipe<TRequest, TResponse>(TRequest request, Func<TRequest, CancellationToken, Task<Result<TResponse>>> next, CancellationToken ct = default)
+
+    public async Task<Result<TResponse>> Pipe<TRequest, TResponse>(TRequest request,
+        Func<TRequest, CancellationToken, Task<Result<TResponse>>> next, CancellationToken ct = default)
     {
         var validator = _serviceProvider.GetService<IValidator<TRequest>>();
 
@@ -23,11 +25,12 @@ public class RequestPipe
             if (!validationResult.IsValid)
                 return validationResult.ToErrorResult();
         }
-        
+
         return await next(request, ct);
     }
-    
-    public async Task<Result> Pipe<TRequest>(TRequest request, Func<TRequest, CancellationToken, Task<Result>> next, CancellationToken ct = default)
+
+    public async Task<Result> Pipe<TRequest>(TRequest request, Func<TRequest, CancellationToken, Task<Result>> next,
+        CancellationToken ct = default)
     {
         var validator = _serviceProvider.GetService<IValidator<TRequest>>();
 
@@ -38,7 +41,7 @@ public class RequestPipe
             if (!validationResult.IsValid)
                 return validationResult.ToErrorResult();
         }
-        
+
         return await next(request, ct);
     }
 }

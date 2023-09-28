@@ -1,4 +1,4 @@
-﻿using AuthService.WebApi.Common.Messaging;
+﻿using AuthService.Common.Messaging;
 using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -17,9 +17,9 @@ public class FakeMessageBus : IMessageBus
 
     public async Task Publish<T>(T entity, CancellationToken ct) where T : class
     {
-        Messages.Add(entity);  
+        Messages.Add(entity);
         var consumer = _serviceProvider.GetService<IConsumer<T>>();
-        
+
         if (consumer == null) return;
 
         var context = Substitute.For<ConsumeContext<T>>();

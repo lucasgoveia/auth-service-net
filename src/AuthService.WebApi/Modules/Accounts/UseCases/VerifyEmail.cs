@@ -1,9 +1,9 @@
 ﻿using System.Data;
-using AuthService.WebApi.Common;
+using AuthService.Common.Consts;
+using AuthService.Common.Results;
+using AuthService.Common.Security;
+using AuthService.Common.Timestamp;
 using AuthService.WebApi.Common.Auth;
-using AuthService.WebApi.Common.Consts;
-using AuthService.WebApi.Common.Results;
-using AuthService.WebApi.Common.Timestamp;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using Dapper;
 using FluentValidation;
@@ -21,7 +21,7 @@ public class VerifyEmailValidator : AbstractValidator<VerifyEmail>
     {
         RuleFor(x => x.Code)
             .NotEmpty()
-            .Length(IEmailVerificationCodeGenerator.CodeLength);
+            .Length(OtpGenerator.CodeLength);
     }
 }
 
@@ -32,7 +32,8 @@ public class VerifyEmailHandler
     private readonly ISessionManager _sessionManager;
     private readonly IAccountEmailVerifiedSetter _accountEmailVerifiedSetter;
 
-    public VerifyEmailHandler(IEmailVerificationManager emailVerificationManager, UtcNow utcNow, ISessionManager sessionManager,
+    public VerifyEmailHandler(IEmailVerificationManager emailVerificationManager, UtcNow utcNow,
+        ISessionManager sessionManager,
         IAccountEmailVerifiedSetter accountEmailVerifiedSetter)
     {
         _emailVerificationManager = emailVerificationManager;
@@ -43,21 +44,17 @@ public class VerifyEmailHandler
 
     public async Task<Result> Handle(VerifyEmail req, CancellationToken ct = default)
     {
-        var accountId = _sessionManager.IdentityId;
+        var userId = _sessionManager.UserId!.Value;
 
-        if (!accountId.HasValue)
-        {
-            throw new InvalidOperationException();
-        }
-
-        var validCode = await _emailVerificationManager.Verify(accountId.Value, req.Code);
+        var validCode = await _emailVerificationManager.Verify(userId, req.Code);
 
         if (!validCode)
         {
             return ErrorResult.Invalid();
         }
 
-        await _accountEmailVerifiedSetter.Set(accountId.Value, _utcNow(), ct);
+        await _emailVerificationManager.RevokeCode(userId);
+        await _accountEmailVerifiedSetter.Set(userId, _utcNow(), ct);
 
         return SuccessResult.Success();
     }
@@ -65,7 +62,7 @@ public class VerifyEmailHandler
 
 public interface IAccountEmailVerifiedSetter
 {
-    Task Set(long accountId, DateTime utcNow, CancellationToken ct = default);
+    Task Set(long userId, DateTime utcNow, CancellationToken ct = default);
 }
 
 public class AccountEmailVerifiedSetter : IAccountEmailVerifiedSetter
@@ -77,10 +74,10 @@ public class AccountEmailVerifiedSetter : IAccountEmailVerifiedSetter
         _dbConnection = dbConnection;
     }
 
-    public async Task Set(long accountId, DateTime utcNow, CancellationToken ct = default)
+    public async Task Set(long userId, DateTime utcNow, CancellationToken ct = default)
     {
         await _dbConnection.ExecuteAsync(
-            $"UPDATE {TableNames.Identities} SET email_verified = true, updated_at = @UtcNow WHERE id = @AccountId",
-            new { AccountId = accountId, UtcNow = utcNow });
+            $"UPDATE {TableNames.Users} SET email_verified = true, updated_at = @utcNow WHERE id = @userId",
+            new { userId, utcNow });
     }
 }

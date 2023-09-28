@@ -1,10 +1,10 @@
 ﻿using System.Data;
-using AuthService.WebApi.Common;
+using AuthService.Common;
+using AuthService.Common.Consts;
+using AuthService.Common.Results;
+using AuthService.Common.Security;
+using AuthService.Common.Timestamp;
 using AuthService.WebApi.Common.Auth;
-using AuthService.WebApi.Common.Consts;
-using AuthService.WebApi.Common.Results;
-using AuthService.WebApi.Common.Security;
-using AuthService.WebApi.Common.Timestamp;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using Dapper;
 using FluentValidation;
@@ -35,11 +35,6 @@ public class RegisterAccountValidator : AbstractValidator<RegisterAccount>
     }
 }
 
-public record RegisterAccountResponse
-{
-    public required string AccessToken { get; init; }
-}
-
 public sealed class RegisterAccountHandler
 {
     private readonly INewAccountSaver _saver;
@@ -50,7 +45,8 @@ public sealed class RegisterAccountHandler
     private readonly IAuthenticationService _authenticationService;
 
     public RegisterAccountHandler(INewAccountSaver saver, UtcNow utcNow, IPasswordHasher passwordHasher,
-        IEmailVerificationManager emailVerificationManager, GenerateId generateId, IAuthenticationService authenticationService)
+        IEmailVerificationManager emailVerificationManager, GenerateId generateId,
+        IAuthenticationService authenticationService)
     {
         _saver = saver;
         _utcNow = utcNow;
@@ -60,24 +56,28 @@ public sealed class RegisterAccountHandler
         _authenticationService = authenticationService;
     }
 
-    public async Task<Result<RegisterAccountResponse>> Handle(RegisterAccount req, CancellationToken ct = default)
+    public async Task<Result> Handle(RegisterAccount req, CancellationToken ct = default)
     {
         var hashedPassword = _passwordHasher.Hash(req.Password);
         var identityId = await _generateId();
-        var account = Identity.CreateNewIdentity(identityId, req.Email, hashedPassword, req.Email, _utcNow());
+        var userId = await _generateId();
 
-        await _saver.Save(account);
+        var account = Identity.CreateNewIdentity(userId, identityId, req.Email, hashedPassword, _utcNow());
+        var user = User.CreateNewUser(userId, req.Email, _utcNow());
 
-        await _emailVerificationManager.SendCode(identityId, req.Email);
+        await _saver.Save(user, account);
 
-        var accessToken = await _authenticationService.Authenticate(identityId, true, ct);
-        return SuccessResult.Success(new RegisterAccountResponse { AccessToken = accessToken });
+        await _emailVerificationManager.SendCode(userId, req.Email);
+
+        await _authenticationService.AuthenticateLimited(userId, identityId, ct);
+
+        return SuccessResult.Success();
     }
 }
 
 public interface INewAccountSaver
 {
-    Task Save(Identity identity);
+    Task Save(User user, Identity identity);
 }
 
 public class NewAccountSaver : INewAccountSaver
@@ -89,18 +89,23 @@ public class NewAccountSaver : INewAccountSaver
         _dbConnection = dbConnection;
     }
 
-    public async Task Save(Identity identity)
+    public async Task Save(User user, Identity identity)
     {
+        if (_dbConnection.State != ConnectionState.Open)
+        {
+            _dbConnection.Open();
+        }
+
+        using var transaction = _dbConnection.BeginTransaction();
+
         await _dbConnection.ExecuteAsync(
-            $"INSERT INTO {TableNames.Identities} (id, username, password_hash, email, created_at, updated_at) VALUES (@Id, @Username, @PasswordHash, @Email, @CreatedAt, @UpdatedAt)",
-            new
-            {
-                identity.Id,
-                identity.Username,
-                identity.PasswordHash,
-                identity.Email,
-                identity.CreatedAt,
-                identity.UpdatedAt,
-            });
+            $"INSERT INTO {TableNames.Users} (id, name, email, created_at, updated_at) VALUES (@Id, @Name, @Email, @CreatedAt, @UpdatedAt)",
+            user);
+
+        await _dbConnection.ExecuteAsync(
+            @$"INSERT INTO {TableNames.Identities} (id, user_id, username, password_hash, created_at, updated_at) VALUES (@Id, @UserId, @Username, @PasswordHash, @CreatedAt, @UpdatedAt)",
+            identity);
+
+        transaction.Commit();
     }
 }

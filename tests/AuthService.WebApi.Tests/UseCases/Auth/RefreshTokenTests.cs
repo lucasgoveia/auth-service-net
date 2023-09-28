@@ -31,10 +31,19 @@ public class RefreshTokenTests : TestBase, IClassFixture<IntegrationTestFactory>
         };
 
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
+        res.EnsureSuccessStatusCode();
+        
+        res = await Client.PostAsJsonAsync("/login", new Login
+        {
+            Password = registerAccountRequest.Password,
+            Username = registerAccountRequest.Email,
+            RememberMe = true,
+        });
+        
+        _accessToken = (await res.Content.ReadFromJsonAsync<LoginResponse>())!.AccessToken;
         _cookies = res.Headers.GetValues(HeaderNames.SetCookie).ToArray();
-        _refreshTokenCookie = res.GetCookies().First(x => x.Name == AuthenticationService.RefreshTokenCookieName);
+        _refreshTokenCookie = res.GetCookies().First(x => x.Name == AuthCookieNames.RefreshTokenCookieName);
 
-        _accessToken = (await res.Content.ReadFromJsonAsync<RegisterAccountResponse>())!.AccessToken;
     }
 
     [Fact]
@@ -60,7 +69,7 @@ public class RefreshTokenTests : TestBase, IClassFixture<IntegrationTestFactory>
     }
 
     [Fact]
-    public async Task RefreshToken_refreshing_more_than_specified_times_should_rotate_token()
+    public async Task RefreshToken_refreshing_exactly_the_allowed_times_should_rotate_token()
     {
         // Arrange
         Client.DefaultRequestHeaders.Add("Cookie", _cookies);
@@ -74,9 +83,30 @@ public class RefreshTokenTests : TestBase, IClassFixture<IntegrationTestFactory>
         var res = await Client.PostAsync("/token", null);
 
         // Assert
-        var resCookie = res.GetCookies().First(x => x.Name == AuthenticationService.RefreshTokenCookieName);
+        var resCookie = res.GetCookies().First(x => x.Name == AuthCookieNames.RefreshTokenCookieName);
         resCookie.Value.Should().NotBe(_refreshTokenCookie.Value);
         resCookie.Value.Should().NotBeNullOrEmpty();
+    }
+    
+    [Fact]
+    public async Task RefreshToken_should_not_allow_after_token_rotation()
+    {
+        // Arrange
+        Client.DefaultRequestHeaders.Add("Cookie", _cookies);
+        for (var _ = 0; _ < (JwtConfig.RefreshTokenAllowedRenewsCount - 1); _++)
+        {
+            await Client.PostAsync("/token", null);
+            DateTimeHolder.MockedUtcNow = DateTimeHolder.MockedUtcNow.AddMinutes(5);
+        }
+
+        // Token rotation occurs here
+        await Client.PostAsync("/token", null);
+        
+        // Act
+        var res = await Client.PostAsync("/token", null);
+
+        // Assert
+        res.Should().HaveStatusCode(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
@@ -112,7 +142,8 @@ public class RefreshTokenTests : TestBase, IClassFixture<IntegrationTestFactory>
 
         for (var _ = 0; _ < JwtConfig.RefreshTokenAllowedRenewsCount - 1; _++)
         {
-            await Client.PostAsync("/token", null);
+            var resMsg = await Client.PostAsync("/token", null);
+            resMsg.EnsureSuccessStatusCode();
             DateTimeHolder.MockedUtcNow = DateTimeHolder.MockedUtcNow.AddMinutes(5);
         }
 
@@ -120,7 +151,7 @@ public class RefreshTokenTests : TestBase, IClassFixture<IntegrationTestFactory>
         var res = await Client.PostAsync("/token", null);
 
         // Assert
-        var rotatedRefreshCookie = res.GetCookies().First(x => x.Name == AuthenticationService.RefreshTokenCookieName);
+        var rotatedRefreshCookie = res.GetCookies().First(x => x.Name == AuthCookieNames.RefreshTokenCookieName);
         var ttl = rotatedRefreshCookie.Expires - DateTimeHolder.MockedUtcNow;
         ttl.Should().NotBe(TimeSpan.FromHours(JwtConfig.RefreshTokenHoursLifetime));
         ttl.Should().BeLessThan(TimeSpan.FromHours(JwtConfig.RefreshTokenHoursLifetime));
@@ -131,6 +162,7 @@ public class RefreshTokenTests : TestBase, IClassFixture<IntegrationTestFactory>
     {
         // Arrange
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+        Client.DefaultRequestHeaders.Add("Cookie", _cookies);
         await Client.PostAsync("/logout", null);
         var registerAccountRequest = new Login
         {
@@ -154,7 +186,7 @@ public class RefreshTokenTests : TestBase, IClassFixture<IntegrationTestFactory>
         var res = await Client.PostAsync("/token", null);
 
         // Assert
-        var rotatedRefreshCookie = res.GetCookies().First(x => x.Name == AuthenticationService.RefreshTokenCookieName);
+        var rotatedRefreshCookie = res.GetCookies().First(x => x.Name == AuthCookieNames.RefreshTokenCookieName);
         var cookieLifetime = rotatedRefreshCookie.Expires - DateTimeHolder.MockedUtcNow;
         cookieLifetime.Should().Be(TimeSpan.FromHours(JwtConfig.RefreshTokenInTrustedDevicesHoursLifetime));
     }

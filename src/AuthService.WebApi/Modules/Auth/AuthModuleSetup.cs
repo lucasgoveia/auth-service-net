@@ -1,5 +1,6 @@
 ﻿using AuthService.WebApi.Common;
-using AuthService.WebApi.Common.Results;
+using AuthService.WebApi.Common.Auth;
+using AuthService.WebApi.Common.ResultExtensions;
 using AuthService.WebApi.Modules.Auth.UseCases;
 using Microsoft.AspNetCore.Mvc;
 
@@ -29,7 +30,11 @@ public static class AuthModuleSetup
                         CancellationToken ct) =>
                     (await pipe.Pipe(RefreshToken.Instance, handler.Handle, ct)).ToApiResult()
             )
-            .AllowAnonymous();
+            .RequireAuthorization(b =>
+            {
+                b.AuthenticationSchemes = new[] { RefreshTokenAuthentication.Scheme };
+                b.RequireAuthenticatedUser();
+            });
 
         builder.MapPost("logout",
                 async ([FromServices] LogOutHandler handler, [FromServices] RequestPipe pipe,

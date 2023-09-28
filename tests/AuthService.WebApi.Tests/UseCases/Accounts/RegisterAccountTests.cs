@@ -1,8 +1,8 @@
 ﻿using System.Data;
 using System.Net;
 using System.Net.Http.Json;
+using AuthService.Common.Consts;
 using AuthService.WebApi.Common.Auth;
-using AuthService.WebApi.Common.Consts;
 using AuthService.WebApi.Messages.Commands;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Tests.Fakes;
@@ -87,27 +87,9 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
-
+    
     [Fact]
-    public async Task Register_account_should_return_access_token()
-    {
-        // Arrange
-        var registerAccountRequest = new RegisterAccount
-        {
-            Email = "test@example.com",
-            Password = "Test1234!_345ax1",
-        };
-
-        // Act
-        var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
-
-        // Assert
-        var resBody = await res.Content.ReadFromJsonAsync<RegisterAccountResponse>();
-        resBody!.AccessToken.Should().NotBeNullOrEmpty();
-    }
-
-    [Fact]
-    public async Task Register_account_should_set_refresh_token_cookie()
+    public async Task Register_account_should_set_limited_token_cookie()
     {
         // Arrange
         var registerAccountRequest = new RegisterAccount
@@ -122,7 +104,7 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
         // Assert
         res.Should().BeSuccessful();
         res.GetCookies().Should().Contain(x =>
-            x.Name == AuthenticationService.RefreshTokenCookieName && !string.IsNullOrEmpty(x.Value));
+            x.Name == AuthCookieNames.LimitedAccessToken && !string.IsNullOrEmpty(x.Value));
     }
 
     [Fact]

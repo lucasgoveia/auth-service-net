@@ -1,6 +1,8 @@
-﻿using AuthService.WebApi.Common;
-using AuthService.WebApi.Common.Security;
-using AuthService.WebApi.Common.Timestamp;
+﻿using AuthService.Common;
+using AuthService.Common.Security;
+using AuthService.Common.Timestamp;
+using AuthService.WebApi.Common;
+using AuthService.WebApi.Common.Auth;
 using IdGen;
 using IdGen.DependencyInjection;
 
@@ -11,6 +13,11 @@ public static class CommonServicesConfiguration
     public static void AddCommonServices(this WebApplicationBuilder builder)
     {
         builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
+        builder.Services.AddSingleton<ISecureKeyGenerator, SecureKeyGenerator>();
+        builder.Services.AddSingleton<IAesEncryptor, AesEncryptor>();
+        builder.Services.AddSingleton<IOtpGenerator, OtpGenerator>();
+
+        builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 
         // IdGen
         builder.Services.AddIdGen(1,

@@ -1,5 +1,5 @@
-﻿using AuthService.WebApi.Common;
-using AuthService.WebApi.Common.Auth;
+﻿using AuthService.WebApi.Common.Auth;
+using AuthService.WebApi.Common.Auth.Requirements;
 using AuthService.WebApi.Common.Devices;
 using Microsoft.AspNetCore.Authorization;
 
@@ -11,16 +11,20 @@ public static class AuthConfiguration
     {
         builder.Services.Configure<JwtConfig>(builder.Configuration.GetSection("JwtConfiguration"));
         builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
-        builder.Services.AddTransient<IIdentityForLoginGetter, IdentityForLoginGetter>();
-        builder.Services.AddTransient<IIdentityDeviceRepository, IdentityDeviceRepository>();
+        builder.Services.AddScoped<IIdentityForLoginGetter, IdentityForLoginGetter>();
         builder.Services.AddScoped<IDeviceIdentifier, DeviceIdentifier>();
 
-        builder.Services.AddTransient<ISessionManager, SessionManagerManager>();
+        builder.Services.AddScoped<ISessionManager, SessionManager>();
+        builder.Services.AddScoped<ITokenManager, TokenManager>();
 
         builder.Services
             .AddAuthentication(CustomJwtAuthentication.Scheme)
             .AddScheme<CustomJwtAuthenticationOptions, CustomJwtAuthenticationHandler>(CustomJwtAuthentication.Scheme,
-                null);
+                null)
+            .AddScheme<RefreshTokenAuthenticationOptions, RefreshTokenAuthenticationHandler>(
+                RefreshTokenAuthentication.Scheme, null)
+            .AddScheme<LimitedSessionAuthenticationOptions, LimitedSessionAuthenticationHandler>(
+                LimitedSessionAuthentication.Scheme, null);
 
         builder.Services
             .AddAuthorization(options =>
@@ -30,5 +34,7 @@ public static class AuthConfiguration
                     .RequireAuthenticatedUser()
                     .Build();
             });
+
+        builder.Services.AddScoped<IAuthorizationHandler, RecoverCodeVerifiedHandler>();
     }
 }

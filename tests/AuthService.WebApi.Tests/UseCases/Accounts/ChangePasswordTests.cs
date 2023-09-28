@@ -1,11 +1,14 @@
-﻿using System.Net;
+﻿using System.Data;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using AngleSharp.Io;
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Modules.Auth.UseCases;
 using AuthService.WebApi.Tests.Utils;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AuthService.WebApi.Tests.UseCases.Accounts;
 
@@ -13,6 +16,8 @@ public class ChangePasswordTests : TestBase, IClassFixture<IntegrationTestFactor
 {
     private const string TestEmail = "test@example.com";
     private const string TestPassword = "Test1234!_345ax1";
+    private string _accessToken = null!;
+    private string[] _cookies = null!;
 
     public ChangePasswordTests(IntegrationTestFactory factory) : base(factory)
     {
@@ -29,9 +34,20 @@ public class ChangePasswordTests : TestBase, IClassFixture<IntegrationTestFactor
         };
 
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
+        res.EnsureSuccessStatusCode();
 
-        var accessToken = (await res.Content.ReadFromJsonAsync<RegisterAccountResponse>())!.AccessToken;
-        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        res = await Client.PostAsJsonAsync("/login", new Login
+        {
+            Password = TestPassword,
+            Username = TestEmail,
+            RememberMe = true,
+        });
+        
+        _accessToken = (await res.Content.ReadFromJsonAsync<LoginResponse>())!.AccessToken;
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+
+        _cookies = res.Headers.GetValues(HeaderNames.SetCookie).ToArray();
+        Client.DefaultRequestHeaders.Add("Cookie", _cookies);
     }
 
     [Fact]
@@ -137,10 +153,12 @@ public class ChangePasswordTests : TestBase, IClassFixture<IntegrationTestFactor
         };
 
         // Act
-        await Client.PostAsJsonAsync("/accounts/change-password", changePasswordRequest);
-        await Client.PostAsync("/logout", null!);
+        var res = await Client.PostAsJsonAsync("/accounts/change-password", changePasswordRequest);
+        res.EnsureSuccessStatusCode();
+        res = await Client.PostAsync("/logout", null!);
+        res.EnsureSuccessStatusCode();
 
-        var res = await Client.PostAsJsonAsync("/login", new Login
+        res = await Client.PostAsJsonAsync("/login", new Login
         {
             Username = TestEmail,
             Password = TestPassword,
@@ -212,7 +230,7 @@ public class ChangePasswordTests : TestBase, IClassFixture<IntegrationTestFactor
 
         // Assert
         var refreshCookie =
-            res.GetCookies().FirstOrDefault(x => x.Name == AuthenticationService.RefreshTokenCookieName);
+            res.GetCookies().FirstOrDefault(x => x.Name == AuthCookieNames.RefreshTokenCookieName);
 
         refreshCookie.Should().NotBeNull();
         refreshCookie!.Value.Should().NotBeNullOrEmpty();
@@ -220,6 +238,65 @@ public class ChangePasswordTests : TestBase, IClassFixture<IntegrationTestFactor
             .Be(DateTimeHolder.MockedUtcNow.Add(
                 TimeSpan.FromHours(JwtConfig.RefreshTokenInTrustedDevicesHoursLifetime)));
     }
-    
-    // TODO: Test LogOutAllSessions
+
+    [Fact]
+    public async Task Change_password_with_logout_all_sessions_options_should_logout_all_other_devices()
+    {
+        // Arrange
+        var otherSessionsRefreshToken = new List<string[]>(capacity: 5);
+        for (var i = 0; i < 5; ++i)
+        {
+            var fingerprint = Guid.NewGuid().ToString();
+            Client.DefaultRequestHeaders.Add("Fingerprint", fingerprint);
+
+            var res = Client.PostAsJsonAsync("/login", new Login
+            {
+                Username = TestEmail,
+                Password = TestPassword,
+                RememberMe = true,
+            }).GetAwaiter().GetResult();
+
+            otherSessionsRefreshToken.Add(res.Headers.GetValues(HeaderNames.SetCookie).ToArray());
+        }
+
+        var changePasswordRequest = new ChangePassword
+        {
+            CurrentPassword = TestPassword,
+            NewPassword = "Test1234!_345ax2",
+            LogOutAllSessions = true
+        };
+
+        // Act
+        await Client.PostAsJsonAsync("/accounts/change-password", changePasswordRequest);
+
+        // Assert
+        foreach (var refreshCookie in otherSessionsRefreshToken)
+        {
+            // Other sessions refresh token should be revoked
+            Client.DefaultRequestHeaders.Add("Cookie", refreshCookie);
+            var res = await Client.PostAsync("/token", null!);
+            res.Should().HaveStatusCode(HttpStatusCode.Unauthorized);
+        }
+    }
+
+    [Fact]
+    public async Task Change_password_with_logout_all_sessions_options_should_maintain_the_response_session_active()
+    {
+        // Arrange
+        var changePasswordRequest = new ChangePassword
+        {
+            CurrentPassword = TestPassword,
+            NewPassword = "Test1234!_345ax2",
+            LogOutAllSessions = true
+        };
+
+        // Act
+        var res = await Client.PostAsJsonAsync("/accounts/change-password", changePasswordRequest);
+        var cookies = res.Headers.GetValues(HeaderNames.SetCookie).ToArray();
+
+        // Assert
+        Client.DefaultRequestHeaders.Add("Cookie", cookies);
+        var refreshRes = await Client.PostAsync("/token", null!);
+        refreshRes.Should().BeSuccessful();
+    }
 }

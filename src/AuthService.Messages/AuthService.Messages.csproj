@@ -7,4 +7,5 @@
         <RootNamespace>AuthService.WebApi.Messages</RootNamespace>
     </PropertyGroup>
 
+
 </Project>

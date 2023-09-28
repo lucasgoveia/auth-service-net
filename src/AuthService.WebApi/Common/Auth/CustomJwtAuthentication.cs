@@ -1,10 +1,13 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Encodings.Web;
-using AuthService.WebApi.Common.Timestamp;
+using AuthService.Common.Timestamp;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace AuthService.WebApi.Common.Auth;
@@ -21,17 +24,16 @@ public class CustomJwtAuthenticationOptions : AuthenticationSchemeOptions
 
 public class CustomJwtAuthenticationHandler : AuthenticationHandler<CustomJwtAuthenticationOptions>
 {
-    private readonly IAuthenticationService _authenticationService;
     private readonly JwtConfig _jwtConfig;
     private readonly UtcNow _utcNow;
-
+    private readonly ITokenManager _tokenManager;
 
     public CustomJwtAuthenticationHandler(IOptionsMonitor<CustomJwtAuthenticationOptions> options,
         ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock, IOptions<JwtConfig> jwtConfig,
-        IAuthenticationService authenticationService, UtcNow utcNow) : base(options, logger, encoder, clock)
+        UtcNow utcNow, ITokenManager tokenManager) : base(options, logger, encoder, clock)
     {
-        _authenticationService = authenticationService;
         _utcNow = utcNow;
+        _tokenManager = tokenManager;
         _jwtConfig = jwtConfig.Value;
     }
 
@@ -43,7 +45,7 @@ public class CustomJwtAuthenticationHandler : AuthenticationHandler<CustomJwtAut
         var authorizationHeader = Request.Headers["Authorization"].ToString();
         if (string.IsNullOrEmpty(authorizationHeader))
         {
-            return AuthenticateResult.NoResult();
+            return AuthenticateResult.Fail("Unauthorized");
         }
 
         if (!authorizationHeader.StartsWith("bearer", StringComparison.OrdinalIgnoreCase))
@@ -53,32 +55,39 @@ public class CustomJwtAuthenticationHandler : AuthenticationHandler<CustomJwtAut
 
         var token = authorizationHeader.Substring("bearer".Length).Trim();
 
-
         var (validatedToken, valid) = await ValidateToken(token);
 
-        if (valid && validatedToken is not null)
+        if (!valid || validatedToken is null)
+            return AuthenticateResult.Fail("Unauthorized");
+
+        var claims = new List<Claim>
         {
-            var claims = new List<Claim>
-            {
-                new(ClaimTypes.NameIdentifier, validatedToken.Subject),
-            };
+            new(ClaimTypes.NameIdentifier, validatedToken.Subject, ClaimValueTypes.Integer64),
+            new(CustomJwtClaimsNames.IdentityId,
+                validatedToken.Claims.First(x => x.Type == CustomJwtClaimsNames.IdentityId).Value,
+                ClaimValueTypes.Integer64),
+        };
 
-            var identity = new ClaimsIdentity(claims, Scheme.Name);
-            var principal = new System.Security.Principal.GenericPrincipal(identity, null);
-            var ticket = new AuthenticationTicket(principal, Scheme.Name);
-            return AuthenticateResult.Success(ticket);
-        }
-
-        return AuthenticateResult.Fail("Unauthorized");
+        var identity = new ClaimsIdentity(claims, Scheme.Name);
+        var principal = new GenericPrincipal(identity, null);
+        var ticket = new AuthenticationTicket(principal, Scheme.Name);
+        return AuthenticateResult.Success(ticket);
     }
 
     private async Task<(JwtSecurityToken?, bool)> ValidateToken(string token)
     {
+        IdentityModelEventSource.ShowPII = true;
+        var publicKeyBytes = Convert.FromBase64String(_jwtConfig.AccessTokenPublicKey);
+        using var rsa = RSA.Create(4096);
+        rsa.ImportRSAPublicKey(publicKeyBytes, out _);
+        
+        var key = new RsaSecurityKey(rsa);
+
         var tokenHandler = new JwtSecurityTokenHandler();
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtConfig.AccessTokenSecret));
 
         var validationParameters = new TokenValidationParameters
         {
+            CryptoProviderFactory = new CryptoProviderFactory { CacheSignatureProviders = false },
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = key,
             ValidateIssuer = true,
@@ -96,15 +105,15 @@ public class CustomJwtAuthenticationHandler : AuthenticationHandler<CustomJwtAut
             tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
 
             var jwtToken = (validatedToken as JwtSecurityToken)!;
-            
-            if (!await _authenticationService.IsAccessTokenRevoked(long.Parse(jwtToken.Subject), token))
+
+            if (!await _tokenManager.IsAccessTokenRevoked(long.Parse(jwtToken.Subject), token))
             {
                 return (jwtToken, true);
             }
 
             return (null, false);
         }
-        catch (SecurityTokenException)
+        catch (SecurityTokenException ex)
         {
             return (null, false);
         }

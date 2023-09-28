@@ -3,4 +3,5 @@
 public enum Templates
 {
     EmailVerification,
+    PasswordRecovery
 }

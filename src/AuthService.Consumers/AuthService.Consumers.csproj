@@ -7,15 +7,18 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="Dapper" Version="2.0.151" />
       <PackageReference Include="MassTransit.AmazonSQS" Version="8.1.0" />
       <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
       <PackageReference Include="StackExchange.Redis" Version="2.6.122" />
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\AuthService.Common\AuthService.Common.csproj" />
       <ProjectReference Include="..\AuthService.EmailTemplating\AuthService.EmailTemplating.csproj" />
       <ProjectReference Include="..\AuthService.Mailing\AuthService.Mailing.csproj" />
       <ProjectReference Include="..\AuthService.Messages\AuthService.Messages.csproj" />
     </ItemGroup>
+
 
 </Project>

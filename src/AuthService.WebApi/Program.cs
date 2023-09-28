@@ -1,4 +1,6 @@
+using AuthService.Common;
 using AuthService.Mailing;
+using AuthService.WebApi.Common;
 using AuthService.WebApi.Configurations;
 using AuthService.WebApi.Modules.Accounts;
 using AuthService.WebApi.Modules.Accounts.UseCases;

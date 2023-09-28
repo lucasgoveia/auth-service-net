@@ -2,13 +2,16 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using AuthService.WebApi.Common.Consts;
+using AuthService.Common.Consts;
+using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Messages.Commands;
 using AuthService.WebApi.Modules.Accounts.UseCases;
+using AuthService.WebApi.Modules.Auth.UseCases;
 using AuthService.WebApi.Tests.Fakes;
 using Dapper;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Net.Http.Headers;
 
 namespace AuthService.WebApi.Tests.UseCases.Accounts;
 
@@ -16,6 +19,7 @@ public class VerifyEmailTests : TestBase, IClassFixture<IntegrationTestFactory>
 {
     private string _code = null!;
     private const string TestEmail = "test@example.com";
+    private const string TestPassword = "Test1234!_345ax1";
 
     public VerifyEmailTests(IntegrationTestFactory factory) : base(factory)
     {
@@ -27,16 +31,15 @@ public class VerifyEmailTests : TestBase, IClassFixture<IntegrationTestFactory>
         var registerAccountRequest = new RegisterAccount
         {
             Email = TestEmail,
-            Password = "Test1234!_345ax1",
+            Password = TestPassword,
         };
 
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
+        res.EnsureSuccessStatusCode();
 
-        var accessToken = (await res.Content.ReadFromJsonAsync<RegisterAccountResponse>())!.AccessToken;
+        Client.DefaultRequestHeaders.Add(HeaderNames.Cookie, res.Headers.GetValues(HeaderNames.SetCookie).ToArray());
 
-        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-        var sendEmailVerification = ((FakeMessageBus)MessageBus)!.Messages.Cast<SendEmailVerification>().First();
+        var sendEmailVerification = MessageBus.Messages.Cast<SendEmailVerification>().First();
         _code = sendEmailVerification.Code;
     }
 
@@ -57,7 +60,7 @@ public class VerifyEmailTests : TestBase, IClassFixture<IntegrationTestFactory>
     }
 
     [Fact]
-    public async Task Verifiy_email_should_set_identity_email_as_verified()
+    public async Task Verifiy_email_should_set_user_email_as_verified()
     {
         // Arrange
         var verifyEmailRequest = new VerifyEmail
@@ -66,11 +69,12 @@ public class VerifyEmailTests : TestBase, IClassFixture<IntegrationTestFactory>
         };
 
         // Act
-        await Client.PostAsJsonAsync("/accounts/verify-email", verifyEmailRequest);
+        var res = await Client.PostAsJsonAsync("/accounts/verify-email", verifyEmailRequest);
+        res.EnsureSuccessStatusCode();
 
         // Assert
         (await Factory.Services.GetRequiredService<IDbConnection>().ExecuteScalarAsync<bool>(
-                $"SELECT email_verified FROM {TableNames.Identities} WHERE email = @Email", new { Email = TestEmail }))
+                $"SELECT email_verified FROM {TableNames.Users} WHERE email = @Email", new { Email = TestEmail }))
             .Should()
             .BeTrue();
     }
@@ -95,7 +99,7 @@ public class VerifyEmailTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task Verify_email_with_not_authenticated_user_returns_unauthorized()
     {
         // Arrange
-        Client.DefaultRequestHeaders.Authorization = null;
+        Client.DefaultRequestHeaders.Remove(HeaderNames.Cookie);
         var verifyEmailRequest = new VerifyEmail
         {
             Code = _code,
@@ -106,5 +110,58 @@ public class VerifyEmailTests : TestBase, IClassFixture<IntegrationTestFactory>
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+    
+    [Fact]
+    public async Task Verify_email_should_not_allow_code_reuse()
+    {
+        // Arrange
+        var verifyEmailRequest = new VerifyEmail
+        {
+            Code = _code,
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync("/accounts/verify-email", verifyEmailRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Act
+        response = await Client.PostAsJsonAsync("/accounts/verify-email", verifyEmailRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+    
+    [Fact]
+    public async Task Verify_email_with_expired_code_returns_error()
+    {
+        // Arrange
+        DateTimeHolder.MockedUtcNow = DateTimeHolder.MockedUtcNow.AddHours(1);
+        
+        var loginRes = await Client.PostAsJsonAsync("/login", new Login
+        {
+            Password = TestPassword,
+            Username = TestEmail,
+            RememberMe = false,
+        });
+        
+        Client.DefaultRequestHeaders.Remove(HeaderNames.Cookie);
+        
+        var accessToken = (await loginRes.Content.ReadFromJsonAsync<LoginResponse>())!.AccessToken;
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        Client.DefaultRequestHeaders.Add(HeaderNames.Cookie, loginRes.Headers.GetValues(HeaderNames.SetCookie).ToArray());
+        
+        var verifyEmailRequest = new VerifyEmail
+        {
+            Code = _code,
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync("/accounts/verify-email", verifyEmailRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 }

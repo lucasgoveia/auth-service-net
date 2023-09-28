@@ -1,5 +1,5 @@
-﻿using AuthService.WebApi.Common.Auth;
-using AuthService.WebApi.Common.Results;
+﻿using AuthService.Common.Results;
+using AuthService.WebApi.Common.Auth;
 using FluentValidation;
 
 namespace AuthService.WebApi.Modules.Auth.UseCases;

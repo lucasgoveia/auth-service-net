@@ -1,4 +1,4 @@
-﻿using AuthService.WebApi.Common.Caching;
+﻿using AuthService.Common.Caching;
 using StackExchange.Redis;
 
 namespace AuthService.WebApi.Configurations;

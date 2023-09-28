@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.RegularExpressions;
-using AuthService.WebApi.Common.Caching;
-using AuthService.WebApi.Common.Timestamp;
+using AuthService.Common.Caching;
+using AuthService.Common.Timestamp;
 
 namespace AuthService.WebApi.Tests.Fakes;
 

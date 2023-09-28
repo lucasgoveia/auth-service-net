@@ -1,11 +1,12 @@
 ﻿using System.Data;
 using System.Data.Common;
+using System.Security.Cryptography;
+using AuthService.Common.Caching;
+using AuthService.Common.Messaging;
+using AuthService.Common.Timestamp;
 using AuthService.Consumers.CommandHandlers;
 using AuthService.Mailing;
-using AuthService.WebApi.Common.Caching;
 using AuthService.WebApi.Common.Devices;
-using AuthService.WebApi.Common.Messaging;
-using AuthService.WebApi.Common.Timestamp;
 using AuthService.WebApi.Tests.Fakes;
 using Dapper;
 using MassTransit;
@@ -42,10 +43,15 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        using var rsa = RSA.Create(4096);
+        var publicKey = Convert.ToBase64String(rsa.ExportRSAPublicKey());
+        var privateKey = Convert.ToBase64String(rsa.ExportRSAPrivateKey());
+        
         builder.UseEnvironment("Testing");
-        Environment.SetEnvironmentVariable("JwtConfiguration__AccessTokenSecret", "ACCESS_VERY_SECURE_SECRET_______");
+        Environment.SetEnvironmentVariable("JwtConfiguration__AccessTokenPrivateKey", privateKey);
+        Environment.SetEnvironmentVariable("JwtConfiguration__AccessTokenPublicKey", publicKey);
         Environment.SetEnvironmentVariable("JwtConfiguration__RefreshTokenSecret",
-            "REFRESH_VERY_SECURE_SECRET________");
+            "REFRESH_VERY_SECURE_SECRET________SOME_MORE_BYTES_HERE");
         Environment.SetEnvironmentVariable("JwtConfiguration__AccessTokenMinutesLifetime", "5");
         Environment.SetEnvironmentVariable("JwtConfiguration__RefreshTokenHoursLifetime", "8");
         Environment.SetEnvironmentVariable("JwtConfiguration__RefreshTokenInTrustedDevicesHoursLifetime", "48");

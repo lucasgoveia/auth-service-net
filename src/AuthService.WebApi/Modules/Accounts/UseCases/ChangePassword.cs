@@ -1,8 +1,8 @@
 ﻿using System.Data;
+using AuthService.Common.Consts;
+using AuthService.Common.Results;
+using AuthService.Common.Security;
 using AuthService.WebApi.Common.Auth;
-using AuthService.WebApi.Common.Consts;
-using AuthService.WebApi.Common.Results;
-using AuthService.WebApi.Common.Security;
 using Dapper;
 using FluentValidation;
 
@@ -55,28 +55,28 @@ public class ChangePasswordHandler
         var changePasswordResult = await _identityPasswordChanger.ChangePassword(_sessionManager.IdentityId!.Value,
             req.CurrentPassword, req.NewPassword, ct);
 
-        if (changePasswordResult.Success)
+        if (!changePasswordResult.Success)
+            return changePasswordResult.AsError()!;
+
+        if (req.LogOutAllSessions)
         {
-            if (req.LogOutAllSessions)
-            {
-                await _authenticationService.LogOutAllSessions(ct);
-            }
-
-            var accessToken = await _authenticationService.Authenticate(_sessionManager.IdentityId!.Value, true, ct);
-
-            return SuccessResult.Success(new ChangePasswordResponse
-            {
-                AccessToken = accessToken
-            });
+            await _authenticationService.LogOutAllSessions(ct);
         }
 
-        return changePasswordResult.AsError()!;
+        var accessToken = await _authenticationService.Authenticate(_sessionManager.UserId!.Value,
+            _sessionManager.IdentityId!.Value, true, ct);
+
+        return SuccessResult.Success(new ChangePasswordResponse
+        {
+            AccessToken = accessToken
+        });
     }
 }
 
 public interface IIdentityPasswordChanger
 {
     Task<Result> ChangePassword(long identityId, string oldPassword, string newPassword, CancellationToken ct);
+    Task ResetPassword(long identityId, string newPassword, CancellationToken ct);
 }
 
 public class IdentityPasswordChanger : IIdentityPasswordChanger
@@ -103,6 +103,12 @@ public class IdentityPasswordChanger : IIdentityPasswordChanger
         var newPassHash = _passwordHasher.Hash(newPassword);
         await PersistNewPassword(identityId, newPassHash, ct);
         return SuccessResult.Success();
+    }
+
+    public async Task ResetPassword(long identityId, string newPassword, CancellationToken ct)
+    {
+        var newPassHash = _passwordHasher.Hash(newPassword);
+        await PersistNewPassword(identityId, newPassHash, ct);
     }
 
     private async Task PersistNewPassword(long identityId, string newPassword, CancellationToken ct)

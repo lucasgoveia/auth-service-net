@@ -1,8 +1,7 @@
 ﻿using System.Data;
-using AuthService.WebApi.Common;
+using AuthService.Common.Consts;
+using AuthService.Common.Results;
 using AuthService.WebApi.Common.Auth;
-using AuthService.WebApi.Common.Consts;
-using AuthService.WebApi.Common.Results;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using Dapper;
 
@@ -16,50 +15,46 @@ public record InitiateEmailVerification
 public class InitiateEmailVerificationHandler
 {
     private readonly IEmailVerificationManager _emailVerificationManager;
-    private readonly IIdentityEmailGetter _identityEmailGetter;
+    private readonly IUserEmailGetter _userEmailGetter;
     private readonly ISessionManager _sessionManager;
 
-    public InitiateEmailVerificationHandler(IEmailVerificationManager emailVerificationManager, ISessionManager sessionManager,
-        IIdentityEmailGetter identityEmailGetter)
+    public InitiateEmailVerificationHandler(IEmailVerificationManager emailVerificationManager,
+        ISessionManager sessionManager,
+        IUserEmailGetter userEmailGetter)
     {
         _emailVerificationManager = emailVerificationManager;
         _sessionManager = sessionManager;
-        _identityEmailGetter = identityEmailGetter;
+        _userEmailGetter = userEmailGetter;
     }
 
     public async Task<Result> Handle(InitiateEmailVerification req, CancellationToken ct = default)
     {
-        var identityId = _sessionManager.IdentityId;
+        var userId = _sessionManager.UserId!.Value;
 
-        if (!identityId.HasValue)
-        {
-            throw new InvalidOperationException();
-        }
-
-        var email = await _identityEmailGetter.Get(identityId.Value, ct);
-        await _emailVerificationManager.SendCode(identityId.Value, email);
+        var email = await _userEmailGetter.Get(userId, ct);
+        await _emailVerificationManager.SendCode(userId, email);
 
         return SuccessResult.Success();
     }
 }
 
-public interface IIdentityEmailGetter
+public interface IUserEmailGetter
 {
-    Task<string> Get(long identityId, CancellationToken ct = default);
+    Task<string> Get(long userId, CancellationToken ct = default);
 }
 
-public class IdentityEmailGetter : IIdentityEmailGetter
+public class UserEmailGetter : IUserEmailGetter
 {
     private readonly IDbConnection _dbConnection;
 
-    public IdentityEmailGetter(IDbConnection dbConnection)
+    public UserEmailGetter(IDbConnection dbConnection)
     {
         _dbConnection = dbConnection;
     }
 
-    public async Task<string> Get(long identityId, CancellationToken ct = default)
+    public async Task<string> Get(long userId, CancellationToken ct = default)
     {
         return await _dbConnection.QuerySingleAsync<string>(
-            $"SELECT email FROM {TableNames.Identities} WHERE Id = @identityId", new { identityId });
+            $"SELECT email FROM {TableNames.Users} WHERE Id = @userId", new { userId });
     }
 }
