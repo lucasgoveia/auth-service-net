@@ -21,7 +21,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddMailingSetup();
+builder.Host.AddMailingSetup();
 
 builder.Services.AddAccountsFunctionality();
 builder.Services.AddAuthFunctionality();

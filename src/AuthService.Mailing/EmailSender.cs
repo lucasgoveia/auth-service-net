@@ -1,7 +1,8 @@
 ﻿using System.Net;
-using System.Net.Mail;
-using Amazon.SimpleEmail;
-using Amazon.SimpleEmail.Model;
+using System.Security.Authentication;
+using MailKit.Net.Smtp;
+using Microsoft.Extensions.Options;
+using MimeKit;
 
 namespace AuthService.Mailing;
 
@@ -12,18 +13,49 @@ public interface IEmailSender
 
 public class EmailSender : IEmailSender
 {
+    private readonly SmtpConfig _config;
+    private readonly MailConfig _mailConfig;
+
+    public EmailSender(IOptions<SmtpConfig> config, IOptions<MailConfig> mailConfig)
+    {
+        _config = config.Value;
+        _mailConfig = mailConfig.Value;
+    }
+    
     public async Task SendEmail(string subject, string body, string recipient)
     {
-        using var smtpClient = new SmtpClient("localhost", 2525);
+        var smtpClient = new SmtpClient();
+        
+        
+        await smtpClient.ConnectAsync(_config.Host, _config.Port);
+        
+        var credentials = new NetworkCredential(_config.UserName, _config.Password);
+        
+        smtpClient.SslProtocols = _config.EnableSsl switch
+        {
+            true => SslProtocols.Tls12,
+            _ => SslProtocols.None
+        };
+        
+        if (!_config.UseDefaultCredentials)
+        {
+            await smtpClient.AuthenticateAsync(credentials);
+        }
+        
+        var message = new MimeMessage();
+        var bodyBuilder = new BodyBuilder
+        {
+            HtmlBody = body,
+            TextBody = "-"
+        }; 
+        
+        message.Body = bodyBuilder.ToMessageBody();
+        message.Subject = subject;
 
-        using var mailMessage = new MailMessage();
-        mailMessage.From = new MailAddress("no-reply@auth.lucasgoveia.com");
-        mailMessage.Subject = subject;
-        mailMessage.Body = body;
-        mailMessage.IsBodyHtml = true;
-
-        mailMessage.To.Add(recipient);
-
-        await smtpClient.SendMailAsync(mailMessage);
+        message.To.Add(new MailboxAddress(recipient, recipient));
+        
+        message.From.Add(new MailboxAddress(_mailConfig.FromName, _mailConfig.FromEmail));
+        
+        await smtpClient.SendAsync(message);
     }
 }

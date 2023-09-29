@@ -1,17 +1,17 @@
-﻿using Amazon;
-using Amazon.Runtime;
-using Amazon.SimpleEmail;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace AuthService.Mailing;
 
 public static class MailingConfiguration
 {
-    public static IServiceCollection AddMailingSetup(this IServiceCollection services)
+    public static void AddMailingSetup(this IHostBuilder hostBuilder)
     {
-        services.AddSingleton<IEmailSender, EmailSender>();
-
-        return services;
+        hostBuilder.ConfigureServices((context, services) =>
+        {
+            services.AddSingleton<IEmailSender, EmailSender>();
+            services.Configure<SmtpConfig>(context.Configuration.GetSection("SmtpConfiguration"));
+            services.Configure<MailConfig>(context.Configuration.GetSection("MailConfiguration"));
+        });
     }
 }
