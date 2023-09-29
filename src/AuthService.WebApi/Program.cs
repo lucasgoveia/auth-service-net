@@ -20,6 +20,7 @@ builder.Services.AddValidatorsFromAssembly(typeof(RegisterAccountValidator).Asse
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHealthChecks();
 
 builder.Host.AddMailingSetup();
 
@@ -42,5 +43,7 @@ app.UseAuthorization();
 
 app.MapAccountsEndpoints();
 app.MapAuthEndpoints();
+
+app.UseHealthChecks("/health");
 
 app.Run();
