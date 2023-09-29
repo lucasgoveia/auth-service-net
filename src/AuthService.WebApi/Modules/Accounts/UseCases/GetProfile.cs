@@ -18,16 +18,10 @@ public record Profile
     public string? AvatarLink { get; init; }
 }
 
-public class GetProfileHandler
+public class GetProfileHandler(IDbConnection dbConnection, ISessionManager sessionManager)
 {
-    private readonly IDbConnection _dbConnection;
-    private readonly ISessionManager _sessionManager;
-
-    public GetProfileHandler(IDbConnection dbConnection, ISessionManager sessionManager)
-    {
-        _dbConnection = dbConnection;
-        _sessionManager = sessionManager;
-    }
+    private readonly IDbConnection _dbConnection = dbConnection;
+    private readonly ISessionManager _sessionManager = sessionManager;
 
     public async Task<Result<Profile>> Handle(GetProfile request, CancellationToken ct)
     {
