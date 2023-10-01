@@ -21,13 +21,9 @@ public static class BusConfiguration
             bus.AddConsumer<LoginAttemptFailedConsumer>();
             bus.AddConsumer<LoginAttemptSucceedConsumer>();
 
-            bus.UsingAmazonSqs((context, cfg) =>
+            bus.UsingAzureServiceBus((context, cfg) =>
             {
-                cfg.Host("sa-east-1", h =>
-                {
-                    h.AccessKey(builder.Configuration.GetValue<string>("aws_access_key_id"));
-                    h.SecretKey(builder.Configuration.GetValue<string>("aws_secret_access_key"));
-                });
+                cfg.Host(builder.Configuration.GetConnectionString("AzureServiceBus"));
 
                 cfg.ConfigureEndpoints(context);
             });
