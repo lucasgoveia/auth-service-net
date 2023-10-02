@@ -11,6 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "deps", "deps", "{F03439E7-6
 	ProjectSection(SolutionItems) = preProject
 		docker-compose.yml = docker-compose.yml
 		Dockerfile = Dockerfile
+		.dockerignore = .dockerignore
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuthService.Messages", "src\AuthService.Messages\AuthService.Messages.csproj", "{FC3AEBE2-E50C-4A07-A640-3D850D7A660A}"

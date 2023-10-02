@@ -20,14 +20,11 @@ public record Profile
 
 public class GetProfileHandler(IDbConnection dbConnection, ISessionManager sessionManager)
 {
-    private readonly IDbConnection _dbConnection = dbConnection;
-    private readonly ISessionManager _sessionManager = sessionManager;
-
     public async Task<Result<Profile>> Handle(GetProfile request, CancellationToken ct)
     {
-        var userId = _sessionManager.UserId!.Value;
+        var userId = sessionManager.UserId!.Value;
 
-        var profile = await _dbConnection.QuerySingleAsync<Profile>(
+        var profile = await dbConnection.QuerySingleAsync<Profile>(
             $"SELECT id AS UserId, name, avatar_link FROM {TableNames.Users} WHERE id = @UserId",
             new { UserId = userId });
 

@@ -1,6 +1,4 @@
-using AuthService.Common;
 using AuthService.Mailing;
-using AuthService.WebApi.Common;
 using AuthService.WebApi.Configurations;
 using AuthService.WebApi.Modules.Accounts;
 using AuthService.WebApi.Modules.Accounts.UseCases;
@@ -8,6 +6,16 @@ using AuthService.WebApi.Modules.Auth;
 using FluentValidation;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddApplicationInsightsTelemetry();
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+builder.Services.AddHealthChecks()
+    .AddNpgSql(builder.Configuration.GetConnectionString("Default")!)
+    .AddRedis(builder.Configuration.GetConnectionString("Redis")!);
+    
 
 builder.AddCommonServices();
 builder.AddBusSetup();
@@ -18,9 +26,6 @@ builder.AddDatabase();
 builder.Services.AddValidatorsFromAssembly(typeof(RegisterAccountValidator).Assembly);
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-builder.Services.AddHealthChecks();
 
 builder.Host.AddMailingSetup();
 
@@ -35,9 +40,9 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    app.UseHttpsRedirection();
 }
 
-app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -10,6 +10,8 @@
   
 
   <ItemGroup>
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="7.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="7.0.1" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="Dapper" Version="2.0.151" />
     <PackageReference Include="FluentValidation" Version="11.7.1" />
@@ -17,6 +19,7 @@
     <PackageReference Include="IdGen" Version="3.0.3" />
     <PackageReference Include="IdGen.DependencyInjection" Version="3.0.0" />
     <PackageReference Include="MassTransit.Azure.ServiceBus.Core" Version="8.1.1" />
+    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.21.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="7.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="7.0.10" />
     <PackageReference Include="Npgsql" Version="7.0.4" />
@@ -42,10 +45,5 @@
     <ProjectReference Include="..\AuthService.Messages\AuthService.Messages.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="..\..\.dockerignore">
-      <Link>.dockerignore</Link>
-    </Content>
-  </ItemGroup>
 
 </Project>
