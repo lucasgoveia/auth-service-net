@@ -13,8 +13,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddHealthChecks()
-    .AddNpgSql(builder.Configuration.GetConnectionString("Default")!)
-    .AddRedis(builder.Configuration.GetConnectionString("Redis")!);
+    .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection")!)
+    .AddRedis(builder.Configuration.GetConnectionString("RedisConnection")!);
     
 
 builder.AddCommonServices();
@@ -45,9 +45,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
-
-app.MapAccountsEndpoints();
-app.MapAuthEndpoints();
+//
+// app.MapAccountsEndpoints();
+// app.MapAuthEndpoints();
 
 app.UseHealthChecks("/health");
 
