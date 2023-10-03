@@ -14,7 +14,7 @@
     <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="7.0.1" />
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="7.1.0" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
-    <PackageReference Include="Dapper" Version="2.0.151" />
+    <PackageReference Include="Dapper" Version="2.1.4" />
     <PackageReference Include="FluentValidation" Version="11.7.1" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.7.1" />
     <PackageReference Include="IdGen" Version="3.0.3" />
