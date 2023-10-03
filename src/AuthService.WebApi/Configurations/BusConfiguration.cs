@@ -21,9 +21,9 @@ public static class BusConfiguration
             bus.AddConsumer<LoginAttemptFailedConsumer>();
             bus.AddConsumer<LoginAttemptSucceedConsumer>();
 
-            bus.UsingAzureServiceBus((context, cfg) =>
+            bus.UsingRabbitMq((context, cfg) =>
             {
-                cfg.Host(builder.Configuration.GetConnectionString("AzureServiceBus"));
+                cfg.Host(builder.Configuration.GetConnectionString("Amqp"));
 
                 cfg.ConfigureEndpoints(context);
             });
