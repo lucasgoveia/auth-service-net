@@ -45,9 +45,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
-//
-// app.MapAccountsEndpoints();
-// app.MapAuthEndpoints();
+
+app.MapAccountsEndpoints();
+app.MapAuthEndpoints();
 
 app.UseHealthChecks("/health");
 
