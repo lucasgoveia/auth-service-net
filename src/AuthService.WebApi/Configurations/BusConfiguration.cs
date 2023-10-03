@@ -10,6 +10,11 @@ public static class BusConfiguration
 {
     public static void AddBusSetup(this WebApplicationBuilder builder)
     {
+        if (builder.Environment.EnvironmentName == "Testing")
+        {
+            return;
+        }
+            
         builder.Services.AddScoped<IMessageBus, MessageBus>();
         builder.Services.AddMassTransit(bus =>
         {
@@ -20,7 +25,7 @@ public static class BusConfiguration
             
             bus.AddConsumer<LoginAttemptFailedConsumer>();
             bus.AddConsumer<LoginAttemptSucceedConsumer>();
-
+            
             bus.UsingRabbitMq((context, cfg) =>
             {
                 cfg.Host(builder.Configuration.GetConnectionString("Amqp"));
