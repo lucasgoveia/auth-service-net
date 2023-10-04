@@ -30,23 +30,11 @@ public record RefreshTokenInfo
     public bool TrustedDevice { get; init; }
 }
 
-public class TokenManager : ITokenManager
-{
-    private readonly UtcNow _utcNow;
-    private readonly JwtConfig _jwtConfig;
-    private readonly ISessionManager _sessionManager;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly ICacher _cacher;
-
-    public TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISessionManager sessionManager,
+public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISessionManager sessionManager,
         IHttpContextAccessor httpContextAccessor, ICacher cacher)
-    {
-        _utcNow = utcNow;
-        _sessionManager = sessionManager;
-        _httpContextAccessor = httpContextAccessor;
-        _cacher = cacher;
-        _jwtConfig = jwtConfig.Value;
-    }
+    : ITokenManager
+{
+    private readonly JwtConfig _jwtConfig = jwtConfig.Value;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static string BuildRefreshTokenKey(long accountId, string sessionId, string refreshToken) =>
@@ -66,7 +54,7 @@ public class TokenManager : ITokenManager
 
     public async Task GenerateAndSetRefreshToken()
     {
-        var session = (await _sessionManager.GetActiveSession())!;
+        var session = (await sessionManager.GetActiveSession())!;
         var exp = GetRefreshTokenLifetime(session.TrustedDevice);
         await GenerateAndSetRefreshToken(session, exp);
     }
@@ -76,30 +64,30 @@ public class TokenManager : ITokenManager
         var refreshToken = GenerateRefreshToken(session.UserId, session.IdentityId,
             session.SessionSecret, expiration);
 
-        await _cacher.Set(
+        await cacher.Set(
             BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken),
             new RefreshTokenInfo { TrustedDevice = session.TrustedDevice, UsageCount = 0 },
             expiration
         );
 
-        _httpContextAccessor.HttpContext!.Response.Cookies.Append(AuthCookieNames.RefreshTokenCookieName, refreshToken,
+        httpContextAccessor.HttpContext!.Response.Cookies.Append(AuthCookieNames.RefreshTokenCookieName, refreshToken,
             new CookieOptions
             {
                 Secure = true,
                 Path = "/",
                 HttpOnly = true,
-                Expires = _utcNow().Add(expiration),
+                Expires = utcNow().Add(expiration),
                 MaxAge = expiration
             });
     }
 
     public async Task<Result<string>> RefreshToken(CancellationToken ct = default)
     {
-        var session = (await _sessionManager.GetActiveSession())!;
-        var refreshToken = _httpContextAccessor.HttpContext!.Request.Cookies[AuthCookieNames.RefreshTokenCookieName]!;
+        var session = (await sessionManager.GetActiveSession())!;
+        var refreshToken = httpContextAccessor.HttpContext!.Request.Cookies[AuthCookieNames.RefreshTokenCookieName]!;
 
         var (info, expiry) =
-            await _cacher.GetWithExpiration<RefreshTokenInfo>(BuildRefreshTokenKey(session.UserId, session.SessionId,
+            await cacher.GetWithExpiration<RefreshTokenInfo>(BuildRefreshTokenKey(session.UserId, session.SessionId,
                 refreshToken));
 
         if (info!.UsageCount + 1 == _jwtConfig.RefreshTokenAllowedRenewsCount)
@@ -108,14 +96,14 @@ public class TokenManager : ITokenManager
                 ? TimeSpan.FromHours(_jwtConfig.RefreshTokenInTrustedDevicesHoursLifetime)
                 : expiry.GetValueOrDefault();
 
-            await _cacher.Remove(BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken));
+            await cacher.Remove(BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken));
             await GenerateAndSetRefreshToken(session, newExpiration);
 
             var accessToken = GenerateAccessToken(session.UserId, session.IdentityId);
             return SuccessResult.Success(accessToken);
         }
 
-        await _cacher.Set(BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken),
+        await cacher.Set(BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken),
             info with { UsageCount = info.UsageCount + 1 },
             expiry);
 
@@ -124,17 +112,17 @@ public class TokenManager : ITokenManager
 
     public async Task<bool> IsAccessTokenRevoked(long userId, string accessToken, CancellationToken ct = default)
     {
-        return await _cacher.Get<bool?>(BuildRevokedAccessTokenKey(userId, accessToken)) ?? false;
+        return await cacher.Get<bool?>(BuildRevokedAccessTokenKey(userId, accessToken)) ?? false;
     }
 
     private string? GetRefreshTokenFromCookie()
     {
-        return _httpContextAccessor.HttpContext!.Request.Cookies[AuthCookieNames.RefreshTokenCookieName];
+        return httpContextAccessor.HttpContext!.Request.Cookies[AuthCookieNames.RefreshTokenCookieName];
     }
 
     private string GetAccessToken()
     {
-        return _httpContextAccessor.HttpContext!.Request.Headers["Authorization"].ToString()
+        return httpContextAccessor.HttpContext!.Request.Headers["Authorization"].ToString()
             .Replace("Bearer ", string.Empty);
     }
 
@@ -144,15 +132,15 @@ public class TokenManager : ITokenManager
         if (string.IsNullOrEmpty(refreshToken))
             return;
 
-        var session = (await _sessionManager.GetActiveSession())!;
-        _httpContextAccessor.HttpContext!.Response.Cookies.Delete(AuthCookieNames.RefreshTokenCookieName);
-        await _cacher.Remove(BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken));
+        var session = (await sessionManager.GetActiveSession())!;
+        httpContextAccessor.HttpContext!.Response.Cookies.Delete(AuthCookieNames.RefreshTokenCookieName);
+        await cacher.Remove(BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken));
     }
 
     public async Task RevokeAccessToken()
     {
-        var session = (await _sessionManager.GetActiveSession())!;
-        await _cacher.Set(BuildRevokedAccessTokenKey(session.UserId, GetAccessToken()), true,
+        var session = (await sessionManager.GetActiveSession())!;
+        await cacher.Set(BuildRevokedAccessTokenKey(session.UserId, GetAccessToken()), true,
             TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
     }
 
@@ -162,8 +150,8 @@ public class TokenManager : ITokenManager
         if (string.IsNullOrEmpty(refreshToken))
             return null;
 
-        var session = (await _sessionManager.GetActiveSession())!;
-        return await _cacher.Get<RefreshTokenInfo>(
+        var session = (await sessionManager.GetActiveSession())!;
+        return await cacher.Get<RefreshTokenInfo>(
             BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken));
     }
 
@@ -171,20 +159,20 @@ public class TokenManager : ITokenManager
     {
         var token = GenerateSymmetricToken(userId, identityId, sessionSecret, lifetime);
 
-        _httpContextAccessor.HttpContext!.Response.Cookies.Append(AuthCookieNames.LimitedAccessToken, token,
+        httpContextAccessor.HttpContext!.Response.Cookies.Append(AuthCookieNames.LimitedAccessToken, token,
             new CookieOptions
             {
                 Secure = true,
                 Path = "/",
                 HttpOnly = true,
-                Expires = _utcNow().Add(lifetime),
+                Expires = utcNow().Add(lifetime),
                 MaxAge = lifetime
             });
     }
 
     public void RemoveLimitedAccessToken()
     {
-        _httpContextAccessor.HttpContext!.Response.Cookies.Delete(AuthCookieNames.LimitedAccessToken);
+        httpContextAccessor.HttpContext!.Response.Cookies.Delete(AuthCookieNames.LimitedAccessToken);
     }
 
     public string GenerateAccessToken(long userId, long identityId)
@@ -199,7 +187,7 @@ public class TokenManager : ITokenManager
 
     private string GenerateSymmetricToken(long userId, long identityId, string secret, TimeSpan lifetime)
     {
-        var now = _utcNow();
+        var now = utcNow();
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
@@ -207,7 +195,7 @@ public class TokenManager : ITokenManager
             new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64)
         };
 
-        var expiry = _utcNow().Add(lifetime);
+        var expiry = utcNow().Add(lifetime);
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
@@ -235,7 +223,7 @@ public class TokenManager : ITokenManager
             CryptoProviderFactory = new CryptoProviderFactory { CacheSignatureProviders = false }
         };
 
-        var now = _utcNow();
+        var now = utcNow();
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
@@ -243,7 +231,7 @@ public class TokenManager : ITokenManager
             new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64)
         };
 
-        var expiry = _utcNow().Add(lifetime);
+        var expiry = utcNow().Add(lifetime);
 
         var token = new JwtSecurityToken(
             issuer: _jwtConfig.Issuer,

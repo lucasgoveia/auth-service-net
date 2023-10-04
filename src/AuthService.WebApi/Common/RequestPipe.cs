@@ -4,19 +4,12 @@ using FluentValidation;
 
 namespace AuthService.WebApi.Common;
 
-public class RequestPipe
+public class RequestPipe(IServiceProvider serviceProvider)
 {
-    private readonly IServiceProvider _serviceProvider;
-
-    public RequestPipe(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
-
     public async Task<Result<TResponse>> Pipe<TRequest, TResponse>(TRequest request,
         Func<TRequest, CancellationToken, Task<Result<TResponse>>> next, CancellationToken ct = default)
     {
-        var validator = _serviceProvider.GetService<IValidator<TRequest>>();
+        var validator = serviceProvider.GetService<IValidator<TRequest>>();
 
         if (validator is not null)
         {
@@ -32,7 +25,7 @@ public class RequestPipe
     public async Task<Result> Pipe<TRequest>(TRequest request, Func<TRequest, CancellationToken, Task<Result>> next,
         CancellationToken ct = default)
     {
-        var validator = _serviceProvider.GetService<IValidator<TRequest>>();
+        var validator = serviceProvider.GetService<IValidator<TRequest>>();
 
         if (validator is not null)
         {

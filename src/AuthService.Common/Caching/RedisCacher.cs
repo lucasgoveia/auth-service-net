@@ -3,17 +3,10 @@ using StackExchange.Redis;
 
 namespace AuthService.Common.Caching;
 
-public class RedisCacher : ICacher
+public class RedisCacher(IConnectionMultiplexer redisConnMultiplexer) : ICacher
 {
-    private readonly IDatabase _redisDb;
-    private readonly IConnectionMultiplexer _redis;
-    
-    public RedisCacher(IConnectionMultiplexer redisConnMultiplexer)
-    {
-        _redis = redisConnMultiplexer;
-        _redisDb = redisConnMultiplexer.GetDatabase();
-    }
-    
+    private readonly IDatabase _redisDb = redisConnMultiplexer.GetDatabase();
+
     public async Task<T?> Get<T>(string key)
     {
         var cacheResult = await _redisDb.StringGetAsync(key);
@@ -66,9 +59,9 @@ public class RedisCacher : ICacher
 
     public async Task ClearPattern(string pattern)
     {
-        foreach (var endpoint in _redis.GetEndPoints())
+        foreach (var endpoint in redisConnMultiplexer.GetEndPoints())
         {
-            var server = _redis.GetServer(endpoint);
+            var server = redisConnMultiplexer.GetServer(endpoint);
             var keysToDelete = server.KeysAsync(pattern: pattern);
             await foreach (var key in keysToDelete)
             {

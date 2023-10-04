@@ -7,26 +7,19 @@ public record DeviceDto
     public required string IpAddress { get; init; }
 }
 
-public class DeviceIdentifier : IDeviceIdentifier
+public class DeviceIdentifier(IHttpContextAccessor httpContextAccessor) : IDeviceIdentifier
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
-
-    public DeviceIdentifier(IHttpContextAccessor httpContextAccessor)
-    {
-        _httpContextAccessor = httpContextAccessor;
-    }
-
     public DeviceDto Identify()
     {
-        var userAgent = _httpContextAccessor.HttpContext!.Request.Headers["User-Agent"].ToString();
-        var fingerprint = _httpContextAccessor.HttpContext!.Request.Headers["Device-Fingerprint"].ToString();
-        var ipAddress = _httpContextAccessor.HttpContext!.Connection.RemoteIpAddress!.ToString();
+        var userAgent = httpContextAccessor.HttpContext!.Request.Headers["User-Agent"].ToString();
+        var fingerprint = httpContextAccessor.HttpContext!.Request.Headers["Device-Fingerprint"].ToString();
+        var ipAddress = httpContextAccessor.HttpContext!.Connection.RemoteIpAddress!.ToString();
 
         return new DeviceDto
         {
             Fingerprint = fingerprint,
             IpAddress = ipAddress,
-            UserAgent = userAgent
+            UserAgent = userAgent.Length > 200 ? userAgent[..200] : userAgent
         };
     }
 }

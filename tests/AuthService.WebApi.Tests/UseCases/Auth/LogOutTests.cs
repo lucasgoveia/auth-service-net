@@ -27,6 +27,7 @@ public class LogOutTests : TestBase, IClassFixture<IntegrationTestFactory>
         {
             Email = "test@example.com",
             Password = "Test1234!_345ax1",
+            Name = "Test User"
         };
 
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);

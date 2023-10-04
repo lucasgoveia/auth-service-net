@@ -8,22 +8,13 @@ using MassTransit;
 
 namespace AuthService.Consumers.CommandHandlers;
 
-public class SendPasswordRecoveryConsumer : IConsumer<SendPasswordRecovery>
+public class SendPasswordRecoveryConsumer(IEmailSender emailSender, IDbConnection dbConnection) : IConsumer<SendPasswordRecovery>
 {
-    private readonly IEmailSender _emailSender;
-    private readonly IDbConnection _dbConnection;
-
-    public SendPasswordRecoveryConsumer(IEmailSender emailSender, IDbConnection dbConnection)
-    {
-        _emailSender = emailSender;
-        _dbConnection = dbConnection;
-    }
-
     public async Task Consume(ConsumeContext<SendPasswordRecovery> context)
     {
         var template = TemplateEmailFinder.GetTemplate(Templates.PasswordRecovery);
 
-        var username = await _dbConnection.QuerySingleOrDefaultAsync<string>(
+        var username = await dbConnection.QuerySingleOrDefaultAsync<string>(
             $"SELECT name FROM {TableNames.Users} WHERE email = @Email",
             new { context.Message.Email });
 
@@ -35,6 +26,6 @@ public class SendPasswordRecoveryConsumer : IConsumer<SendPasswordRecovery>
             codeExpirationMinutes = context.Message.CodeExpirationMinutes
         };
         var (subject, body) = template.Render(data);
-        await _emailSender.SendEmail(subject, body, context.Message.Email);
+        await emailSender.SendEmail(subject, body, context.Message.Email);
     }
 }

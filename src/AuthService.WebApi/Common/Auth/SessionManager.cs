@@ -249,28 +249,20 @@ public interface ISessionRepository
     Task DeleteUserSessions(long userId, DateTime now);
 }
 
-public class SessionRepository : ISessionRepository
+public class SessionRepository(IDbConnection dbConnection, IAesEncryptor aesEncryptor, IOptions<JwtConfig> jwtConfig)
+    : ISessionRepository
 {
-    private readonly IDbConnection _dbConnection;
-    private readonly IAesEncryptor _aesEncryptor;
-    private readonly string _refreshTokenSecret;
-
-    public SessionRepository(IDbConnection dbConnection, IAesEncryptor aesEncryptor, IOptions<JwtConfig> jwtConfig)
-    {
-        _dbConnection = dbConnection;
-        _aesEncryptor = aesEncryptor;
-        _refreshTokenSecret = jwtConfig.Value.RefreshTokenSecret;
-    }
+    private readonly string _refreshTokenSecret = jwtConfig.Value.RefreshTokenSecret;
 
     public async Task Add(Session session)
     {
         session = session with
         {
             SessionSecret =
-            await _aesEncryptor.Encrypt(session.SessionSecret, _refreshTokenSecret, session.SessionId)
+            await aesEncryptor.Encrypt(session.SessionSecret, _refreshTokenSecret, session.SessionId)
         };
 
-        await _dbConnection.ExecuteAsync(
+        await dbConnection.ExecuteAsync(
             @$"INSERT INTO {TableNames.UserSessions} 
                 (session_id, user_id, identity_id, ip_address, user_agent, device_fingerprint, created_at, session_secret) 
                 VALUES (@SessionId, @UserId, @IdentityId, @IpAddress, @UserAgent, @DeviceFingerprint, @CreatedAt, @SessionSecret)",
@@ -279,7 +271,7 @@ public class SessionRepository : ISessionRepository
 
     public async Task<Session?> Get(string sessionId)
     {
-        var session = await _dbConnection.QuerySingleOrDefaultAsync<Session>(
+        var session = await dbConnection.QuerySingleOrDefaultAsync<Session>(
             @$"SELECT * FROM {TableNames.UserSessions} WHERE session_id = @sessionId AND ended_at IS NULL",
             new { sessionId });
 
@@ -289,20 +281,20 @@ public class SessionRepository : ISessionRepository
         return session with
         {
             SessionSecret =
-            await _aesEncryptor.Decrypt(session.SessionSecret, _refreshTokenSecret, session.SessionId)
+            await aesEncryptor.Decrypt(session.SessionSecret, _refreshTokenSecret, session.SessionId)
         };
     }
 
     public async Task Delete(string sessionId, DateTime now)
     {
-        await _dbConnection.ExecuteAsync(
+        await dbConnection.ExecuteAsync(
             @$"UPDATE {TableNames.UserSessions} SET ended_at = @now WHERE session_id = @sessionId AND ended_at IS NULL",
             new { sessionId, now });
     }
 
     public async Task DeleteUserSessions(long userId, DateTime now)
     {
-        await _dbConnection.ExecuteAsync(
+        await dbConnection.ExecuteAsync(
             @$"UPDATE {TableNames.UserSessions} SET ended_at = @now WHERE user_id = @userId AND ended_at IS NULL",
             new { userId, now });
     }

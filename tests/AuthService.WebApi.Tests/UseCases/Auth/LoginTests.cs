@@ -23,6 +23,7 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
         {
             Email = TestEmail,
             Password = TestPassword,
+            Name = "Test User"
         };
 
         await Client.PostAsJsonAsync("/accounts/register", req);

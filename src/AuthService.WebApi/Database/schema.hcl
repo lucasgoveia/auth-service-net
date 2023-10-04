@@ -154,7 +154,7 @@ table "user_sessions" {
   }
   column "user_agent" {
     null = false
-    type = varchar(50)
+    type = varchar(200)
   }
   column "device_fingerprint" {
     null = false

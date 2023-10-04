@@ -12,27 +12,16 @@ public record InitiateEmailVerification
     public static readonly InitiateEmailVerification Instance = new();
 }
 
-public class InitiateEmailVerificationHandler
+public class InitiateEmailVerificationHandler(IEmailVerificationManager emailVerificationManager,
+    ISessionManager sessionManager,
+    IUserEmailGetter userEmailGetter)
 {
-    private readonly IEmailVerificationManager _emailVerificationManager;
-    private readonly IUserEmailGetter _userEmailGetter;
-    private readonly ISessionManager _sessionManager;
-
-    public InitiateEmailVerificationHandler(IEmailVerificationManager emailVerificationManager,
-        ISessionManager sessionManager,
-        IUserEmailGetter userEmailGetter)
-    {
-        _emailVerificationManager = emailVerificationManager;
-        _sessionManager = sessionManager;
-        _userEmailGetter = userEmailGetter;
-    }
-
     public async Task<Result> Handle(InitiateEmailVerification req, CancellationToken ct = default)
     {
-        var userId = _sessionManager.UserId!.Value;
+        var userId = sessionManager.UserId!.Value;
 
-        var email = await _userEmailGetter.Get(userId, ct);
-        await _emailVerificationManager.SendCode(userId, email);
+        var email = await userEmailGetter.Get(userId, ct);
+        await emailVerificationManager.SendCode(userId, email);
 
         return SuccessResult.Success();
     }
@@ -43,18 +32,11 @@ public interface IUserEmailGetter
     Task<string> Get(long userId, CancellationToken ct = default);
 }
 
-public class UserEmailGetter : IUserEmailGetter
+public class UserEmailGetter(IDbConnection dbConnection) : IUserEmailGetter
 {
-    private readonly IDbConnection _dbConnection;
-
-    public UserEmailGetter(IDbConnection dbConnection)
-    {
-        _dbConnection = dbConnection;
-    }
-
     public async Task<string> Get(long userId, CancellationToken ct = default)
     {
-        return await _dbConnection.QuerySingleAsync<string>(
+        return await dbConnection.QuerySingleAsync<string>(
             $"SELECT email FROM {TableNames.Users} WHERE Id = @userId", new { userId });
     }
 }

@@ -13,46 +13,34 @@ public interface IEmailVerificationManager
     Task RevokeCode(long userId);
 }
 
-public class EmailVerificationManager : IEmailVerificationManager
-{
-    private readonly IEmailVerificationCodeRepository _codeRepository;
-    private readonly IPasswordHasher _hasher;
-    private readonly IMessageBus _bus;
-    private readonly IOtpGenerator _otpGenerator;
-
-    public EmailVerificationManager(IEmailVerificationCodeRepository codeRepository,
+public class EmailVerificationManager(IEmailVerificationCodeRepository codeRepository,
         IPasswordHasher hasher, IMessageBus bus, IOtpGenerator otpGenerator)
-    {
-        _codeRepository = codeRepository;
-        _hasher = hasher;
-        _bus = bus;
-        _otpGenerator = otpGenerator;
-    }
-
+    : IEmailVerificationManager
+{
     public async Task SendCode(long userId, string email)
     {
-        var code = _otpGenerator.Generate();
-        var hashedCode = _hasher.Hash(code);
-        await _bus.Publish(new SendEmailVerification { Code = code, Email = email });
-        await _codeRepository.Save(userId, hashedCode);
+        var code = otpGenerator.Generate();
+        var hashedCode = hasher.Hash(code);
+        await bus.Publish(new SendEmailVerification { Code = code, Email = email });
+        await codeRepository.Save(userId, hashedCode);
     }
 
 
     public async Task<bool> Verify(long userId, string code)
     {
-        var savedHashedCode = await _codeRepository.Get(userId);
+        var savedHashedCode = await codeRepository.Get(userId);
 
         if (savedHashedCode is null)
         {
             return false;
         }
 
-        return _hasher.Verify(code, savedHashedCode);
+        return hasher.Verify(code, savedHashedCode);
     }
 
     public Task RevokeCode(long userId)
     {
-        return _codeRepository.Remove(userId);
+        return codeRepository.Remove(userId);
     }
 }
 

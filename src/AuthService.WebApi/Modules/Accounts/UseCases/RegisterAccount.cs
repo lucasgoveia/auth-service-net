@@ -15,6 +15,7 @@ public record RegisterAccount
 {
     public required string Email { get; init; }
     public required string Password { get; init; }
+    public required string? Name { get; init; }
 }
 
 public class RegisterAccountValidator : AbstractValidator<RegisterAccount>
@@ -30,46 +31,30 @@ public class RegisterAccountValidator : AbstractValidator<RegisterAccount>
             .NotEmpty()
             .MustAsync(async (p, ct) => await passwordPolicy.IsValid(p));
 
-        RuleFor(x => x.Password)
-            .NotEmpty();
+        RuleFor(x => x.Name)
+            .NotEmpty()
+            .MinimumLength(2);
     }
 }
 
-public sealed class RegisterAccountHandler
+public sealed class RegisterAccountHandler(INewAccountSaver saver, UtcNow utcNow, IPasswordHasher passwordHasher,
+    IEmailVerificationManager emailVerificationManager, GenerateId generateId,
+    IAuthenticationService authenticationService)
 {
-    private readonly INewAccountSaver _saver;
-    private readonly UtcNow _utcNow;
-    private readonly IPasswordHasher _passwordHasher;
-    private readonly IEmailVerificationManager _emailVerificationManager;
-    private readonly GenerateId _generateId;
-    private readonly IAuthenticationService _authenticationService;
-
-    public RegisterAccountHandler(INewAccountSaver saver, UtcNow utcNow, IPasswordHasher passwordHasher,
-        IEmailVerificationManager emailVerificationManager, GenerateId generateId,
-        IAuthenticationService authenticationService)
-    {
-        _saver = saver;
-        _utcNow = utcNow;
-        _passwordHasher = passwordHasher;
-        _emailVerificationManager = emailVerificationManager;
-        _generateId = generateId;
-        _authenticationService = authenticationService;
-    }
-
     public async Task<Result> Handle(RegisterAccount req, CancellationToken ct = default)
     {
-        var hashedPassword = _passwordHasher.Hash(req.Password);
-        var identityId = await _generateId();
-        var userId = await _generateId();
+        var hashedPassword = passwordHasher.Hash(req.Password);
+        var identityId = await generateId();
+        var userId = await generateId();
 
-        var account = Identity.CreateNewIdentity(userId, identityId, req.Email, hashedPassword, _utcNow());
-        var user = User.CreateNewUser(userId, req.Email, _utcNow());
+        var account = Identity.CreateNewIdentity(userId, identityId, req.Email, hashedPassword, utcNow());
+        var user = User.CreateNewUser(userId, req.Email, req.Name, utcNow());
 
-        await _saver.Save(user, account);
+        await saver.Save(user, account);
 
-        await _emailVerificationManager.SendCode(userId, req.Email);
+        await emailVerificationManager.SendCode(userId, req.Email);
 
-        await _authenticationService.AuthenticateLimited(userId, identityId, ct);
+        await authenticationService.AuthenticateLimited(userId, identityId, ct);
 
         return SuccessResult.Success();
     }

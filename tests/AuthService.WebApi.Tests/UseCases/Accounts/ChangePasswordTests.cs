@@ -1,5 +1,4 @@
-﻿using System.Data;
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using AngleSharp.Io;
@@ -8,7 +7,6 @@ using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Modules.Auth.UseCases;
 using AuthService.WebApi.Tests.Utils;
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace AuthService.WebApi.Tests.UseCases.Accounts;
 
@@ -31,6 +29,7 @@ public class ChangePasswordTests : TestBase, IClassFixture<IntegrationTestFactor
         {
             Email = TestEmail,
             Password = TestPassword,
+            Name = "Test User"
         };
 
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
@@ -42,7 +41,7 @@ public class ChangePasswordTests : TestBase, IClassFixture<IntegrationTestFactor
             Username = TestEmail,
             RememberMe = true,
         });
-        
+
         _accessToken = (await res.Content.ReadFromJsonAsync<LoginResponse>())!.AccessToken;
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 

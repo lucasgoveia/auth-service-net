@@ -21,31 +21,22 @@ public class VerifyPasswordRecoveryCodeValidator : AbstractValidator<VerifyPassw
     }
 }
 
-public class VerifyPasswordRecoveryCodeHandler
+public class VerifyPasswordRecoveryCodeHandler(IPasswordRecoveryManager passwordRecoveryManager,
+    ISessionManager sessionManager)
 {
-    private readonly IPasswordRecoveryManager _passwordRecoveryManager;
-    private readonly ISessionManager _sessionManager;
-
-    public VerifyPasswordRecoveryCodeHandler(IPasswordRecoveryManager passwordRecoveryManager,
-        ISessionManager sessionManager)
-    {
-        _passwordRecoveryManager = passwordRecoveryManager;
-        _sessionManager = sessionManager;
-    }
-
     public async Task<Result> Handle(VerifyPasswordRecoveryCode req, CancellationToken ct = default)
     {
-        var userId = _sessionManager.UserId!.Value;
+        var userId = sessionManager.UserId!.Value;
 
-        var validCode = await _passwordRecoveryManager.Verify(userId, req.Code);
+        var validCode = await passwordRecoveryManager.Verify(userId, req.Code);
 
         if (!validCode)
         {
             return ErrorResult.Invalid();
         }
 
-        await _sessionManager.AddSessionProperty(SessionPropertiesNames.VerifiedRecoveryCode, true);
-        await _passwordRecoveryManager.RevokeCode(userId);
+        await sessionManager.AddSessionProperty(SessionPropertiesNames.VerifiedRecoveryCode, true);
+        await passwordRecoveryManager.RevokeCode(userId);
         return SuccessResult.Success();
     }
 }

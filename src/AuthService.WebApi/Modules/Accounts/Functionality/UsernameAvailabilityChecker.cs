@@ -9,18 +9,11 @@ public interface IUsernameAvailabilityChecker
     Task<bool> IsAvailable(string username, CancellationToken cancellationToken = default);
 }
 
-public class UsernameAvailabilityChecker : IUsernameAvailabilityChecker
+public class UsernameAvailabilityChecker(IDbConnection dbConnection) : IUsernameAvailabilityChecker
 {
-    private readonly IDbConnection _dbConnection;
-
-    public UsernameAvailabilityChecker(IDbConnection dbConnection)
-    {
-        _dbConnection = dbConnection;
-    }
-
     public async Task<bool> IsAvailable(string username, CancellationToken cancellationToken = default)
     {
-        var count = await _dbConnection.QuerySingleAsync<int>(
+        var count = await dbConnection.QuerySingleAsync<int>(
             $"SELECT COUNT(*) FROM {TableNames.Identities} WHERE LOWER(username) = @Username",
             new { Username = username.ToLower() });
         return count == 0;

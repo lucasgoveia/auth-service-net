@@ -5,7 +5,6 @@ using AuthService.Common.Consts;
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Messages.Commands;
 using AuthService.WebApi.Modules.Accounts.UseCases;
-using AuthService.WebApi.Tests.Fakes;
 using AuthService.WebApi.Tests.Utils;
 using Dapper;
 using FluentAssertions;
@@ -27,6 +26,7 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
         {
             Email = "test@example.com",
             Password = "Test1234!_345ax1",
+            Name = "Test User"
         };
 
         // Act
@@ -44,6 +44,7 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
         {
             Email = "test",
             Password = "Test1234!_345ax1",
+            Name = "Test User"
         };
 
         // Act
@@ -61,6 +62,7 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
         {
             Email = "teste@example.com",
             Password = "test",
+            Name = "Test User"
         };
 
         // Act
@@ -76,8 +78,9 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
         // Arrange
         var registerAccountRequest = new RegisterAccount
         {
-            Email = "test@example.com",
+            Email = "test",
             Password = "Test1234!_345ax1",
+            Name = "Test User"
         };
         await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
 
@@ -87,7 +90,7 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
-    
+
     [Fact]
     public async Task Register_account_should_set_limited_token_cookie()
     {
@@ -96,6 +99,7 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
         {
             Email = "test@example.com",
             Password = "Test1234!_345ax1",
+            Name = "Test User"
         };
 
         // Act
@@ -115,13 +119,14 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
         {
             Email = "test@example.com",
             Password = "Test1234!_345ax1",
+            Name = "Test User"
         };
 
         // Act
         await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
 
         // Assert
-        ((FakeMessageBus)MessageBus).Messages.Should().Contain(x =>
+        MessageBus.Messages.Should().Contain(x =>
             x is SendEmailVerification && ((SendEmailVerification)x).Email == registerAccountRequest.Email);
     }
 
@@ -133,6 +138,7 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
         {
             Email = "test@example.com",
             Password = "Test1234!_345ax1",
+            Name = "Test User"
         };
 
         // Act

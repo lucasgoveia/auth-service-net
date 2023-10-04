@@ -11,17 +11,12 @@ public interface IEmailSender
     Task SendEmail(string subject, string body, string recipient);
 }
 
-public class EmailSender : IEmailSender
+public class EmailSender(IOptions<SmtpConfig> config, IOptions<MailConfig> mailConfig)
+    : IEmailSender
 {
-    private readonly SmtpConfig _config;
-    private readonly MailConfig _mailConfig;
+    private readonly SmtpConfig _config = config.Value;
+    private readonly MailConfig _mailConfig = mailConfig.Value;
 
-    public EmailSender(IOptions<SmtpConfig> config, IOptions<MailConfig> mailConfig)
-    {
-        _config = config.Value;
-        _mailConfig = mailConfig.Value;
-    }
-    
     public async Task SendEmail(string subject, string body, string recipient)
     {
         var smtpClient = new SmtpClient();

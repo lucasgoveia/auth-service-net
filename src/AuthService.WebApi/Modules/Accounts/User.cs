@@ -17,12 +17,12 @@ public record User
     public int AccessFailedCount { get; init; }
     public bool TwoFactorEnabled { get; init; }
     
-    public static User CreateNewUser(long id, string email, DateTime now)
+    public static User CreateNewUser(long id, string email, string? name, DateTime now)
     {
         return new User
         {
             Id = id,
-            Name = email,
+            Name = name ?? email,
             Email = email,
             CreatedAt = now,
             UpdatedAt = now

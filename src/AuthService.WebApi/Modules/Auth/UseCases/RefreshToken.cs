@@ -13,18 +13,11 @@ public record RefreshTokenResponse
     public required string AccessToken { get; init; }
 }
 
-public class RefreshTokenHandler
+public class RefreshTokenHandler(ITokenManager tokenManager)
 {
-    private readonly ITokenManager _tokenManager;
-
-    public RefreshTokenHandler(ITokenManager tokenManager)
-    {
-        _tokenManager = tokenManager;
-    }
-
     public async Task<Result<RefreshTokenResponse>> Handle(RefreshToken req, CancellationToken ct = default)
     {
-        return (await _tokenManager.RefreshToken(ct))
+        return (await tokenManager.RefreshToken(ct))
             .Map(accessToken => new RefreshTokenResponse { AccessToken = accessToken });
     }
 }

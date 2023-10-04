@@ -27,6 +27,7 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
         {
             Email = TestEmail,
             Password = TestPassword,
+            Name = "Test User"
         };
 
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);

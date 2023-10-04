@@ -25,6 +25,7 @@ public class VerifyPasswordRecoverCodeTests : TestBase, IClassFixture<Integratio
         {
             Email = TestEmail,
             Password = TestPassword,
+            Name = "Test User"
         };
 
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);

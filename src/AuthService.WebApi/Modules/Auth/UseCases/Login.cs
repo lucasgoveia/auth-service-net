@@ -25,18 +25,11 @@ public record LoginResponse
     public required string AccessToken { get; init; }
 }
 
-public class LoginHandler
+public class LoginHandler(IAuthenticationService authenticationService)
 {
-    private readonly IAuthenticationService _authenticationService;
-
-    public LoginHandler(IAuthenticationService authenticationService)
-    {
-        _authenticationService = authenticationService;
-    }
-
     public async Task<Result<LoginResponse>> Handle(Login req, CancellationToken ct = default)
     {
-        var result = await _authenticationService.LogIn(req.Username, req.Password, req.RememberMe, ct);
+        var result = await authenticationService.LogIn(req.Username, req.Password, req.RememberMe, ct);
 
         return result.Map(accessToken => new LoginResponse { AccessToken = accessToken });
     }

@@ -20,20 +20,12 @@ public class LimitedSessionAuthenticationOptions : AuthenticationSchemeOptions
     public static CustomJwtAuthenticationOptions Instance = new();
 }
 
-public class LimitedSessionAuthenticationHandler : AuthenticationHandler<LimitedSessionAuthenticationOptions>
-{
-    private readonly ISessionManager _sessionManager;
-    private readonly JwtConfig _jwtConfig;
-    private readonly UtcNow _utcNow;
-
-    public LimitedSessionAuthenticationHandler(IOptionsMonitor<LimitedSessionAuthenticationOptions> options,
+public class LimitedSessionAuthenticationHandler(IOptionsMonitor<LimitedSessionAuthenticationOptions> options,
         ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock, ISessionManager sessionManager,
-        IOptions<JwtConfig> jwtConfig, UtcNow utcNow) : base(options, logger, encoder, clock)
-    {
-        _sessionManager = sessionManager;
-        _jwtConfig = jwtConfig.Value;
-        _utcNow = utcNow;
-    }
+        IOptions<JwtConfig> jwtConfig, UtcNow utcNow)
+    : AuthenticationHandler<LimitedSessionAuthenticationOptions>(options, logger, encoder, clock)
+{
+    private readonly JwtConfig _jwtConfig = jwtConfig.Value;
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -74,7 +66,7 @@ public class LimitedSessionAuthenticationHandler : AuthenticationHandler<Limited
     private async Task<(JwtSecurityToken?, bool)> ValidateToken(string token)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
-        var session = await _sessionManager.GetActiveSession();
+        var session = await sessionManager.GetActiveSession();
 
         if (session is null)
         {
@@ -93,7 +85,7 @@ public class LimitedSessionAuthenticationHandler : AuthenticationHandler<Limited
                 (audiences, _, _) => audiences.Any(),
             ValidIssuer = _jwtConfig.Issuer,
             ValidateLifetime = true,
-            LifetimeValidator = (_, expires, _, _) => expires >= _utcNow(),
+            LifetimeValidator = (_, expires, _, _) => expires >= utcNow(),
             ClockSkew = TimeSpan.Zero,
         };
 

@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddCors();
 builder.Services.AddApplicationInsightsTelemetry();
 
 builder.Services.AddEndpointsApiExplorer();
@@ -44,6 +45,17 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
     app.UseHttpsRedirection();
 }
+
+app.UseCors(c =>
+{
+    c.AllowAnyHeader();
+    c.AllowAnyMethod();
+    c.SetIsOriginAllowedToAllowWildcardSubdomains();
+    c.WithOrigins(
+        builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()!
+    );
+    c.AllowCredentials();
+});
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -22,20 +22,12 @@ public class CustomJwtAuthenticationOptions : AuthenticationSchemeOptions
     public static CustomJwtAuthenticationOptions Instance = new();
 }
 
-public class CustomJwtAuthenticationHandler : AuthenticationHandler<CustomJwtAuthenticationOptions>
-{
-    private readonly JwtConfig _jwtConfig;
-    private readonly UtcNow _utcNow;
-    private readonly ITokenManager _tokenManager;
-
-    public CustomJwtAuthenticationHandler(IOptionsMonitor<CustomJwtAuthenticationOptions> options,
+public class CustomJwtAuthenticationHandler(IOptionsMonitor<CustomJwtAuthenticationOptions> options,
         ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock, IOptions<JwtConfig> jwtConfig,
-        UtcNow utcNow, ITokenManager tokenManager) : base(options, logger, encoder, clock)
-    {
-        _utcNow = utcNow;
-        _tokenManager = tokenManager;
-        _jwtConfig = jwtConfig.Value;
-    }
+        UtcNow utcNow, ITokenManager tokenManager)
+    : AuthenticationHandler<CustomJwtAuthenticationOptions>(options, logger, encoder, clock)
+{
+    private readonly JwtConfig _jwtConfig = jwtConfig.Value;
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -95,7 +87,7 @@ public class CustomJwtAuthenticationHandler : AuthenticationHandler<CustomJwtAut
                 (audiences, _, _) => audiences.Any(),
             ValidIssuer = _jwtConfig.Issuer,
             ValidateLifetime = true,
-            LifetimeValidator = (_, expires, _, _) => expires >= _utcNow(),
+            LifetimeValidator = (_, expires, _, _) => expires >= utcNow(),
             ClockSkew = TimeSpan.Zero,
         };
 
@@ -105,7 +97,7 @@ public class CustomJwtAuthenticationHandler : AuthenticationHandler<CustomJwtAut
 
             var jwtToken = (validatedToken as JwtSecurityToken)!;
 
-            if (!await _tokenManager.IsAccessTokenRevoked(long.Parse(jwtToken.Subject), token))
+            if (!await tokenManager.IsAccessTokenRevoked(long.Parse(jwtToken.Subject), token))
             {
                 return (jwtToken, true);
             }

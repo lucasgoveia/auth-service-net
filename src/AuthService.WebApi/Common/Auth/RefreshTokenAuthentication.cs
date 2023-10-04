@@ -20,23 +20,13 @@ public class RefreshTokenAuthenticationOptions : AuthenticationSchemeOptions
     public static CustomJwtAuthenticationOptions Instance = new();
 }
 
-public class RefreshTokenAuthenticationHandler : AuthenticationHandler<RefreshTokenAuthenticationOptions>
-{
-    private readonly ISessionManager _sessionManager;
-    private readonly ITokenManager _tokenManager;
-    private readonly JwtConfig _jwtConfig;
-    private readonly UtcNow _utcNow;
-
-    public RefreshTokenAuthenticationHandler(IOptionsMonitor<RefreshTokenAuthenticationOptions> options,
+public class RefreshTokenAuthenticationHandler(IOptionsMonitor<RefreshTokenAuthenticationOptions> options,
         ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock, ISessionManager sessionManager,
-        IOptions<JwtConfig> jwtConfig, UtcNow utcNow, ITokenManager tokenManager) : base(options, logger, encoder,
-        clock)
-    {
-        _sessionManager = sessionManager;
-        _utcNow = utcNow;
-        _tokenManager = tokenManager;
-        _jwtConfig = jwtConfig.Value;
-    }
+        IOptions<JwtConfig> jwtConfig, UtcNow utcNow, ITokenManager tokenManager)
+    : AuthenticationHandler<RefreshTokenAuthenticationOptions>(options, logger, encoder,
+    clock)
+{
+    private readonly JwtConfig _jwtConfig = jwtConfig.Value;
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -75,7 +65,7 @@ public class RefreshTokenAuthenticationHandler : AuthenticationHandler<RefreshTo
     private async Task<(JwtSecurityToken?, bool)> ValidateToken(string token)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
-        var session = await _sessionManager.GetActiveSession();
+        var session = await sessionManager.GetActiveSession();
 
         if (session is null)
         {
@@ -94,7 +84,7 @@ public class RefreshTokenAuthenticationHandler : AuthenticationHandler<RefreshTo
                 (audiences, _, _) => audiences.Any(),
             ValidIssuer = _jwtConfig.Issuer,
             ValidateLifetime = true,
-            LifetimeValidator = (_, expires, _, _) => expires >= _utcNow(),
+            LifetimeValidator = (_, expires, _, _) => expires >= utcNow(),
             ClockSkew = TimeSpan.Zero,
         };
 
@@ -104,7 +94,7 @@ public class RefreshTokenAuthenticationHandler : AuthenticationHandler<RefreshTo
 
             var jwtToken = (validatedToken as JwtSecurityToken)!;
 
-            var refreshTokenInfo = await _tokenManager.GetRefreshTokenInfo();
+            var refreshTokenInfo = await tokenManager.GetRefreshTokenInfo();
 
             if (refreshTokenInfo is null)
             {

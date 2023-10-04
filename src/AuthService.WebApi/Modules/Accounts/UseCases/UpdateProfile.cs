@@ -21,23 +21,12 @@ public class UpdateProfileValidator : AbstractValidator<UpdateProfile>
     }
 }
 
-public class UpdateProfileHandler
+public class UpdateProfileHandler(ISessionManager sessionManager, UtcNow utcNow, IProfileUpdater profileUpdater)
 {
-    private readonly ISessionManager _sessionManager;
-    private readonly UtcNow _utcNow;
-    private readonly IProfileUpdater _profileUpdater;
-
-    public UpdateProfileHandler(ISessionManager sessionManager, UtcNow utcNow, IProfileUpdater profileUpdater)
-    {
-        _sessionManager = sessionManager;
-        _utcNow = utcNow;
-        _profileUpdater = profileUpdater;
-    }
-
     public async Task<Result> Handle(UpdateProfile request, CancellationToken ct)
     {
-        var userId = _sessionManager.UserId!.Value;
-        await _profileUpdater.UpdateProfile(userId, request.Name, _utcNow(), ct);
+        var userId = sessionManager.UserId!.Value;
+        await profileUpdater.UpdateProfile(userId, request.Name, utcNow(), ct);
 
         return SuccessResult.Success();
     }
@@ -48,18 +37,11 @@ public interface IProfileUpdater
     Task UpdateProfile(long userId, string name, DateTime utcNow, CancellationToken ct);
 }
 
-public class ProfileUpdater : IProfileUpdater
+public class ProfileUpdater(IDbConnection dbConnection) : IProfileUpdater
 {
-    private readonly IDbConnection _dbConnection;
-
-    public ProfileUpdater(IDbConnection dbConnection)
-    {
-        _dbConnection = dbConnection;
-    }
-
     public async Task UpdateProfile(long userId, string name, DateTime utcNow, CancellationToken ct)
     {
-        await _dbConnection.ExecuteAsync(
+        await dbConnection.ExecuteAsync(
             $"UPDATE {TableNames.Users} SET name = @name, updated_at = @utcNow WHERE id = @userId",
             new { name, utcNow, userId });
     }

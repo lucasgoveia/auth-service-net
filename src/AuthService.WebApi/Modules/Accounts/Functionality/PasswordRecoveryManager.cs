@@ -13,45 +13,33 @@ public interface IPasswordRecoveryManager
     Task RevokeCode(long userId);
 }
 
-public class PasswordRecoveryManager : IPasswordRecoveryManager
-{
-    private readonly IOtpGenerator _otpGenerator;
-    private readonly IPasswordRecoveryCodeRepository _codeRepository;
-    private readonly IPasswordHasher _hasher;
-    private readonly IMessageBus _bus;
-
-    public PasswordRecoveryManager(IOtpGenerator otpGenerator,
+public class PasswordRecoveryManager(IOtpGenerator otpGenerator,
         IPasswordRecoveryCodeRepository codeRepository, IPasswordHasher hasher, IMessageBus bus)
-    {
-        _otpGenerator = otpGenerator;
-        _codeRepository = codeRepository;
-        _hasher = hasher;
-        _bus = bus;
-    }
-
+    : IPasswordRecoveryManager
+{
     public async Task SendCode(long userId, string email)
     {
-        var code = _otpGenerator.Generate();
-        var hashedCode = _hasher.Hash(code);
-        await _bus.Publish(new SendPasswordRecovery { Email = email, Code = code, CodeExpirationMinutes = PasswordRecoveryCodeRepository.CodeExpirationMinutes });
-        await _codeRepository.Save(userId, hashedCode);
+        var code = otpGenerator.Generate();
+        var hashedCode = hasher.Hash(code);
+        await bus.Publish(new SendPasswordRecovery { Email = email, Code = code, CodeExpirationMinutes = PasswordRecoveryCodeRepository.CodeExpirationMinutes });
+        await codeRepository.Save(userId, hashedCode);
     }
 
     public async Task<bool> Verify(long userId, string code)
     {
-        var savedHashedCode = await _codeRepository.Get(userId);
+        var savedHashedCode = await codeRepository.Get(userId);
 
         if (savedHashedCode is null)
         {
             return false;
         }
 
-        return _hasher.Verify(code, savedHashedCode);
+        return hasher.Verify(code, savedHashedCode);
     }
 
     public Task RevokeCode(long userId)
     {
-        return _codeRepository.Remove(userId);
+        return codeRepository.Remove(userId);
     }
 }
 

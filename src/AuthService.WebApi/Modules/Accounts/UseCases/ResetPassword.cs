@@ -20,28 +20,15 @@ public class ResetPasswordValidator : AbstractValidator<ResetPassword>
     }
 }
 
-public class ResetPasswordHandler
+public class ResetPasswordHandler(IIdentityPasswordChanger identityPasswordChanger, ISessionManager sessionManager,
+    IAuthenticationService authenticationService, ITokenManager tokenManager)
 {
-    private readonly IIdentityPasswordChanger _identityPasswordChanger;
-    private readonly ISessionManager _sessionManager;
-    private readonly IAuthenticationService _authenticationService;
-    private readonly ITokenManager _tokenManager;
-
-    public ResetPasswordHandler(IIdentityPasswordChanger identityPasswordChanger, ISessionManager sessionManager,
-        IAuthenticationService authenticationService, ITokenManager tokenManager)
-    {
-        _identityPasswordChanger = identityPasswordChanger;
-        _sessionManager = sessionManager;
-        _authenticationService = authenticationService;
-        _tokenManager = tokenManager;
-    }
-
     public async Task<Result> Handle(ResetPassword req, CancellationToken ct)
     {
-        await _identityPasswordChanger.ResetPassword(_sessionManager.IdentityId!.Value, req.NewPassword, ct);
-        await _sessionManager.TerminateSession();
-        _tokenManager.RemoveLimitedAccessToken();
-        await _authenticationService.LogOutAllSessions(ct);
+        await identityPasswordChanger.ResetPassword(sessionManager.IdentityId!.Value, req.NewPassword, ct);
+        await sessionManager.TerminateSession();
+        tokenManager.RemoveLimitedAccessToken();
+        await authenticationService.LogOutAllSessions(ct);
         
         return SuccessResult.Success();
     }

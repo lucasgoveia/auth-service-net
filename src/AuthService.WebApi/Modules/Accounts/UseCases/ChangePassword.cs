@@ -36,23 +36,12 @@ public record ChangePasswordResponse
     public required string AccessToken { get; init; }
 }
 
-public class ChangePasswordHandler
+public class ChangePasswordHandler(IIdentityPasswordChanger identityPasswordChanger, ISessionManager sessionManager,
+    IAuthenticationService authenticationService)
 {
-    private readonly IIdentityPasswordChanger _identityPasswordChanger;
-    private readonly ISessionManager _sessionManager;
-    private readonly IAuthenticationService _authenticationService;
-
-    public ChangePasswordHandler(IIdentityPasswordChanger identityPasswordChanger, ISessionManager sessionManager,
-        IAuthenticationService authenticationService)
-    {
-        _identityPasswordChanger = identityPasswordChanger;
-        _sessionManager = sessionManager;
-        _authenticationService = authenticationService;
-    }
-
     public async Task<Result<ChangePasswordResponse>> Handle(ChangePassword req, CancellationToken ct)
     {
-        var changePasswordResult = await _identityPasswordChanger.ChangePassword(_sessionManager.IdentityId!.Value,
+        var changePasswordResult = await identityPasswordChanger.ChangePassword(sessionManager.IdentityId!.Value,
             req.CurrentPassword, req.NewPassword, ct);
 
         if (!changePasswordResult.Success)
@@ -60,11 +49,11 @@ public class ChangePasswordHandler
 
         if (req.LogOutAllSessions)
         {
-            await _authenticationService.LogOutAllSessions(ct);
+            await authenticationService.LogOutAllSessions(ct);
         }
 
-        var accessToken = await _authenticationService.Authenticate(_sessionManager.UserId!.Value,
-            _sessionManager.IdentityId!.Value, true, ct);
+        var accessToken = await authenticationService.Authenticate(sessionManager.UserId!.Value,
+            sessionManager.IdentityId!.Value, true, ct);
 
         return SuccessResult.Success(new ChangePasswordResponse
         {

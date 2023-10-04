@@ -32,7 +32,6 @@
   <ItemGroup>
     <Folder Include="Database\" />
     <Folder Include="Database\migrations\" />
-    <Folder Include="Modules\Profiles\UseCases\" />
   </ItemGroup>
 
   <ItemGroup>

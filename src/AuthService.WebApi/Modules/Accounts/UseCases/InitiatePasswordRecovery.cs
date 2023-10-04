@@ -21,23 +21,12 @@ public class InitiatePasswordRecoveryValidator : AbstractValidator<InitiatePassw
     }
 }
 
-public class InitiatePasswordRecoveryHandler
+public class InitiatePasswordRecoveryHandler(IPasswordRecoveryManager passwordRecoveryManager,
+    IAuthenticationService authenticationService, IDbConnection dbConnection)
 {
-    private readonly IPasswordRecoveryManager _passwordRecoveryManager;
-    private readonly IAuthenticationService _authenticationService;
-    private readonly IDbConnection _dbConnection;
-
-    public InitiatePasswordRecoveryHandler(IPasswordRecoveryManager passwordRecoveryManager,
-        IAuthenticationService authenticationService, IDbConnection dbConnection)
-    {
-        _passwordRecoveryManager = passwordRecoveryManager;
-        _authenticationService = authenticationService;
-        _dbConnection = dbConnection;
-    }
-
     public async Task<Result> Handle(InitiatePasswordRecovery request, CancellationToken ct)
     {
-        var info = await _dbConnection.QuerySingleOrDefaultAsync<(long userId, long identityId)?>(
+        var info = await dbConnection.QuerySingleOrDefaultAsync<(long userId, long identityId)?>(
             $"SELECT user_id, id FROM {TableNames.Identities} WHERE username = @Email", request);
 
         if (!info.HasValue)
@@ -45,8 +34,8 @@ public class InitiatePasswordRecoveryHandler
 
         var (userId, identityId) = info.Value;
         
-        await _passwordRecoveryManager.SendCode(userId, request.Email);
-        await _authenticationService.AuthenticateLimited(userId, identityId, ct);
+        await passwordRecoveryManager.SendCode(userId, request.Email);
+        await authenticationService.AuthenticateLimited(userId, identityId, ct);
         return SuccessResult.Success();
     }
 }

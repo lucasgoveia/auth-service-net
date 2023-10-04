@@ -20,6 +20,7 @@ public class InitiatePasswordRecoveryTests : TestBase, IClassFixture<Integration
         {
             Email = "test@example.com",
             Password = "Test1234!_345ax1",
+            Name = "Test User"
         };
 
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);

@@ -24,6 +24,7 @@ public class InitiateEmailVerificationTests : TestBase, IClassFixture<Integratio
         {
             Email = TestEmail,
             Password = "Test1234!_345ax1",
+            Name = "Test User"
         };
 
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);

@@ -19,17 +19,8 @@ public class PasswordPolicy : IPasswordPolicy
     }
 }
 
-public class PasswordEntropyValidator
+public class PasswordEntropyValidator(double minEntropy, int maxSequenceLength)
 {
-    private readonly double _minEntropy;
-    private readonly int _maxSequenceLength;
-
-    public PasswordEntropyValidator(double minEntropy, int maxSequenceLength)
-    {
-        _minEntropy = minEntropy;
-        _maxSequenceLength = maxSequenceLength;
-    }
-
     public bool Validate(string password)
     {
         // Remove sequences from the password
@@ -38,21 +29,21 @@ public class PasswordEntropyValidator
         // Calculate the entropy of the password without sequences
         var entropy = CalculateEntropy(passwordWithoutSequences);
 
-        return entropy >= _minEntropy;
+        return entropy >= minEntropy;
     }
     
     private double CalculateEntropy(string password)
     {
         var uniqueCharacters = (new HashSet<char>(password)).Count;
-        
-        var entropy = Math.Log(uniqueCharacters, 2) * password.Length;
+
+        var entropy = password.Length * Math.Log(uniqueCharacters) / Math.Log(2);
 
         return entropy;
     }
     
     private string RemoveSequences(string password)
     {
-        var pattern = @"(\w)\1{" + (_maxSequenceLength - 1) + @",}";
+        var pattern = @"(\w)\1{" + (maxSequenceLength - 1) + @",}";
         
         var passwordWithoutSequences = Regex.Replace(password, pattern, "");
 
