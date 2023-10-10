@@ -1,4 +1,5 @@
 ﻿using AuthService.WebApi.Common.Auth;
+using AuthService.WebApi.Common.Auth.Requirements;
 using AuthService.WebApi.Common.Devices;
 using Microsoft.AspNetCore.Authorization;
 
@@ -33,5 +34,7 @@ public static class AuthConfiguration
                     .RequireAuthenticatedUser()
                     .Build();
             });
+
+        builder.Services.AddScoped<IAuthorizationHandler, NotAuthenticatedHandler>();
     }
 }

@@ -245,6 +245,7 @@ public class ChangePasswordTests : TestBase, IClassFixture<IntegrationTestFactor
         var otherSessionsRefreshToken = new List<string[]>(capacity: 5);
         for (var i = 0; i < 5; ++i)
         {
+            Client.DefaultRequestHeaders.Authorization = null;
             var fingerprint = Guid.NewGuid().ToString();
             Client.DefaultRequestHeaders.Add("Fingerprint", fingerprint);
 
@@ -257,6 +258,8 @@ public class ChangePasswordTests : TestBase, IClassFixture<IntegrationTestFactor
 
             otherSessionsRefreshToken.Add(res.Headers.GetValues(HeaderNames.SetCookie).ToArray());
         }
+        
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
         var changePasswordRequest = new ChangePassword
         {

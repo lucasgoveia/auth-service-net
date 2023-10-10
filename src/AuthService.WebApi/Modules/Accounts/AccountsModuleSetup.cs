@@ -51,7 +51,7 @@ public static class AccountsModuleSetup
                         [FromServices] RequestPipe pipe, CancellationToken ct) =>
                     (await pipe.Pipe(req, handler.Handle, ct)).ToApiResult()
             )
-            .AllowAnonymous();
+            .RequireNotAuthenticated();
 
         builder.MapPost("accounts/verify-email",
                 async ([FromBody] VerifyEmail req, [FromServices] VerifyEmailHandler handler,
@@ -89,14 +89,14 @@ public static class AccountsModuleSetup
                     [FromServices] RequestPipe pipe, [FromBody] InitiatePasswordRecovery req, CancellationToken ct) =>
                 (await pipe.Pipe(req, handler.Handle, ct)).ToApiResult()
             )
-            .AllowAnonymous();
+            .RequireNotAuthenticated();
 
         builder.MapPost("accounts/verify-password-recovery-code", async (
                     [FromServices] VerifyPasswordRecoveryCodeHandler handler,
                     [FromServices] RequestPipe pipe, [FromBody] VerifyPasswordRecoveryCode req, CancellationToken ct) =>
                 (await pipe.Pipe(req, handler.Handle, ct)).ToApiResult()
             )
-            .AllowAnonymous();
+            .RequireNotAuthenticated();
 
         builder.MapPost("accounts/reset-password", async (
                     [FromServices] ResetPasswordHandler handler,

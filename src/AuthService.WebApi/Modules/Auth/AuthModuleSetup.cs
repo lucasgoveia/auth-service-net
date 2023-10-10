@@ -23,7 +23,7 @@ public static class AuthModuleSetup
                 async ([FromBody] Login req, [FromServices] LoginHandler handler, [FromServices] RequestPipe pipe,
                     CancellationToken ct) => (await pipe.Pipe(req, handler.Handle, ct)).ToApiResult()
             )
-            .AllowAnonymous();
+            .RequireNotAuthenticated();
 
         builder.MapPost("token",
                 async ([FromServices] RefreshTokenHandler handler, [FromServices] RequestPipe pipe,

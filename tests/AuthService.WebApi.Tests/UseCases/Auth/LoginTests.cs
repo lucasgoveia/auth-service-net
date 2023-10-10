@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Modules.Auth.UseCases;
@@ -186,5 +187,29 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
 
         // Assert
         res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Login_should_not_allow_if_already_authenticated()
+    {
+        // Arrange
+        var loginReq = new Login
+        {
+            Username = TestEmail,
+            Password = TestPassword,
+            RememberMe = false,
+        };
+        
+        var res = await Client.PostAsJsonAsync("/login", loginReq);
+        res.EnsureSuccessStatusCode();
+        
+        var token = (await res.Content.ReadFromJsonAsync<LoginResponse>())!.AccessToken;
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        
+        // Act
+        res = await Client.PostAsJsonAsync("/login", loginReq);
+        
+        // Assert
+        res.Should().HaveStatusCode(HttpStatusCode.Forbidden);
     }
 }
