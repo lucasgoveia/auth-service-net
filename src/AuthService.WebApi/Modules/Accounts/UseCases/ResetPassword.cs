@@ -26,8 +26,8 @@ public class ResetPasswordHandler(IIdentityPasswordChanger identityPasswordChang
     public async Task<Result> Handle(ResetPassword req, CancellationToken ct)
     {
         await identityPasswordChanger.ResetPassword(sessionManager.IdentityId!.Value, req.NewPassword, ct);
-        await sessionManager.TerminateSession();
-        tokenManager.RemoveLimitedAccessToken();
+
+        await tokenManager.RevokeAccessToken();
         await authenticationService.LogOutAllSessions(ct);
         
         return SuccessResult.Success();

@@ -1,31 +1,28 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Security.Principal;
 using System.Text;
 using System.Text.Encodings.Web;
 using AuthService.Common.Timestamp;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace AuthService.WebApi.Common.Auth;
 
-public static class CustomJwtAuthentication
+public static class ResetPasswordJwtAuthentication
 {
-    public const string Scheme = nameof(CustomJwtAuthentication);
+    public const string Scheme = "ResetPasswordJwtAuthentication";
 }
 
-public class CustomJwtAuthenticationOptions : AuthenticationSchemeOptions
+public class ResetPasswordJwtAuthenticationOptions : AuthenticationSchemeOptions
 {
-    public static CustomJwtAuthenticationOptions Instance = new();
+    public static ResetPasswordJwtAuthenticationOptions Instance = new();
 }
 
-public class CustomJwtAuthenticationHandler(IOptionsMonitor<CustomJwtAuthenticationOptions> options,
-        ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock, IOptions<JwtConfig> jwtConfig,
-        UtcNow utcNow, ITokenManager tokenManager)
-    : AuthenticationHandler<CustomJwtAuthenticationOptions>(options, logger, encoder, clock)
+public class ResetPasswordJwtAuthenticationHandler(IOptionsMonitor<ResetPasswordJwtAuthenticationOptions> options,
+        ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock, IOptions<JwtConfig> jwtConfig, UtcNow utcNow,
+        ITokenManager tokenManager)
+    : AuthenticationHandler<ResetPasswordJwtAuthenticationOptions>(options, logger, encoder,
+        clock)
 {
     private readonly JwtConfig _jwtConfig = jwtConfig.Value;
 
@@ -45,19 +42,15 @@ public class CustomJwtAuthenticationHandler(IOptionsMonitor<CustomJwtAuthenticat
 
         var ticket = JwtUtils.CreateAuthenticationTicket(validatedToken.Subject,
             validatedToken.Claims.First(x => x.Type == CustomJwtClaimsNames.IdentityId).Value, Scheme.Name);
+
         return AuthenticateResult.Success(ticket);
     }
 
     private async Task<(JwtSecurityToken?, bool)> ValidateToken(string token)
     {
-        var publicKeyBytes = Convert.FromBase64String(_jwtConfig.AccessTokenPublicKey);
-        using var rsa = RSA.Create(4096);
-        rsa.ImportRSAPublicKey(publicKeyBytes, out _);
-        
-        var key = new RsaSecurityKey(rsa);
-
         var tokenHandler = new JwtSecurityTokenHandler();
 
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtConfig.ResetPasswordTokenSecret));
         var validationParameters = JwtUtils.GetTokenValidationParameters(key, utcNow, _jwtConfig);
 
         try

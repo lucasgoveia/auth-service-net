@@ -30,35 +30,20 @@ public class RefreshTokenAuthenticationHandler(IOptionsMonitor<RefreshTokenAuthe
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (!Request.Cookies.ContainsKey(AuthCookieNames.RefreshTokenCookieName))
-            return AuthenticateResult.Fail("Unauthorized");
-
-        if (!Request.Cookies.TryGetValue(AuthCookieNames.RefreshTokenCookieName, out var refreshCookie))
+        var token = Request.GetTokenFromCookie(AuthCookieNames.RefreshTokenCookieName);
+        
+        if (string.IsNullOrEmpty(token))
         {
             return AuthenticateResult.Fail("Unauthorized");
         }
 
-        if (string.IsNullOrEmpty(refreshCookie))
-        {
-            return AuthenticateResult.Fail("Unauthorized");
-        }
-
-        var (validatedToken, valid) = await ValidateToken(refreshCookie);
+        var (validatedToken, valid) = await ValidateToken(token);
 
         if (!valid || validatedToken is null)
             return AuthenticateResult.Fail("Unauthorized");
 
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, validatedToken.Subject, ClaimValueTypes.Integer64),
-            new(CustomJwtClaimsNames.IdentityId,
-                validatedToken.Claims.First(x => x.Type == CustomJwtClaimsNames.IdentityId).Value,
-                ClaimValueTypes.Integer64),
-        };
-
-        var identity = new ClaimsIdentity(claims, Scheme.Name);
-        var principal = new GenericPrincipal(identity, null);
-        var ticket = new AuthenticationTicket(principal, Scheme.Name);
+        var ticket = JwtUtils.CreateAuthenticationTicket(validatedToken.Subject,
+            validatedToken.Claims.First(x => x.Type == CustomJwtClaimsNames.IdentityId).Value, Scheme.Name);
         return AuthenticateResult.Success(ticket);
     }
 
@@ -73,21 +58,8 @@ public class RefreshTokenAuthenticationHandler(IOptionsMonitor<RefreshTokenAuthe
         }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(session.SessionSecret));
-
-        var validationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = key,
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            AudienceValidator =
-                (audiences, _, _) => audiences.Any(),
-            ValidIssuer = _jwtConfig.Issuer,
-            ValidateLifetime = true,
-            LifetimeValidator = (_, expires, _, _) => expires >= utcNow(),
-            ClockSkew = TimeSpan.Zero,
-        };
-
+        var validationParameters = JwtUtils.GetTokenValidationParameters(key, utcNow, _jwtConfig);
+        
         try
         {
             tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);

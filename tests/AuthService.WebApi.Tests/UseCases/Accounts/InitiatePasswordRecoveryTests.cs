@@ -68,7 +68,7 @@ public class InitiatePasswordRecoveryTests : TestBase, IClassFixture<Integration
             Email = "someemail@example.com"
         });
 
-        ((FakeMessageBus)MessageBus).Messages
+        MessageBus.Messages
             .OfType<SendPasswordRecovery>()
             .Should()
             .BeEmpty();
@@ -82,7 +82,7 @@ public class InitiatePasswordRecoveryTests : TestBase, IClassFixture<Integration
             Email = "test@example.com"
         });
         
-        ((FakeMessageBus)MessageBus).Messages
+        MessageBus.Messages
             .OfType<SendPasswordRecovery>()
             .Should()
             .Contain(x => x.Email == "test@example.com");

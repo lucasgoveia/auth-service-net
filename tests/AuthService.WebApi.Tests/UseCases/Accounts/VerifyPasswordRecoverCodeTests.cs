@@ -37,8 +37,6 @@ public class VerifyPasswordRecoverCodeTests : TestBase, IClassFixture<Integratio
         });
         res.EnsureSuccessStatusCode();
         
-        _cookies = res.Headers.GetValues(HeaderNames.SetCookie).ToArray();
-        Client.DefaultRequestHeaders.Add(HeaderNames.Cookie, _cookies); 
         _code = MessageBus.Messages.OfType<SendPasswordRecovery>().First().Code;
     }
     
@@ -47,6 +45,7 @@ public class VerifyPasswordRecoverCodeTests : TestBase, IClassFixture<Integratio
     {
         var response = await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
         {
+            Email = TestEmail,
             Code = _code
         });
         
@@ -58,6 +57,7 @@ public class VerifyPasswordRecoverCodeTests : TestBase, IClassFixture<Integratio
     {
         var response = await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
         {
+            Email = TestEmail,
             Code = "invalid-code"
         });
         
@@ -69,6 +69,7 @@ public class VerifyPasswordRecoverCodeTests : TestBase, IClassFixture<Integratio
     {
         var response = await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
         {
+            Email = TestEmail,
             Code = "123456"
         });
         
@@ -76,29 +77,12 @@ public class VerifyPasswordRecoverCodeTests : TestBase, IClassFixture<Integratio
     }
     
     [Fact]
-    public async Task VerifyPasswordRecoverCode_with_expired_session_should_return_unauthorized()
+    public async Task VerifyPasswordRecoverCode_with_expired_code_should_return_bad_request()
     {
         DateTimeHolder.MockedUtcNow = DateTimeHolder.MockedUtcNow.AddHours(1);
         var response = await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
         {
-            Code = _code
-        });
-        
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-    
-    [Fact]
-    public async Task VerifyPasswordRecoverCode_with_utilized_code_should_return_bad_request() 
-    {
-        var response = await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
-        {
-            Code = _code
-        });
-        
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
-        response = await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
-        {
+            Email = TestEmail,
             Code = _code
         });
         
@@ -106,15 +90,22 @@ public class VerifyPasswordRecoverCodeTests : TestBase, IClassFixture<Integratio
     }
     
     [Fact]
-    public async Task VerifiyPasswordRecoverCode_with_unauthroized_user_should_return_unauthorized()
+    public async Task VerifyPasswordRecoverCode_with_utilized_code_should_return_bad_request() 
     {
-        Client.DefaultRequestHeaders.Remove(HeaderNames.Cookie);
         var response = await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
         {
+            Email = TestEmail,
             Code = _code
         });
         
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        
+        response = await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
+        {
+            Email = TestEmail,
+            Code = _code
+        });
+        
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
-
 }

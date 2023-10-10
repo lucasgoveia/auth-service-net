@@ -36,7 +36,6 @@ public interface ISessionManager
     Task<Session?> GetActiveSession();
     Task TerminateSession();
     Task TerminateAllSessions();
-    Task<Session> CreateLimitedSession(long userId, long identityId, DeviceDto device);
     Task AddSessionProperty<T>(string name, T value);
     Task<T?> GetSessionProperty<T>(string name);
 }
@@ -144,11 +143,6 @@ public class SessionManager : ISessionManager
             throw new InvalidOperationException();
 
         return await _cacher.Get<T>(BuildSessionPropKey(UserId.Value, SessionId, name));
-    }
-
-    public async Task<Session> CreateLimitedSession(long userId, long identityId, DeviceDto device)
-    {
-        return await CreateSession(userId, identityId, device, false, TimeSpan.FromMinutes(15));
     }
 
     public async Task<Session> CreateSession(long userId, long identityId, DeviceDto device, bool trustedDevice = false)

@@ -37,8 +37,10 @@ public class VerifyEmailTests : TestBase, IClassFixture<IntegrationTestFactory>
 
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
         res.EnsureSuccessStatusCode();
+        
+        var accessToken = (await res.Content.ReadFromJsonAsync<RegisterAccountResponse>())!.AccessToken;
 
-        Client.DefaultRequestHeaders.Add(HeaderNames.Cookie, res.Headers.GetValues(HeaderNames.SetCookie).ToArray());
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         var sendEmailVerification = MessageBus.Messages.Cast<SendEmailVerification>().First();
         _code = sendEmailVerification.Code;
@@ -100,7 +102,7 @@ public class VerifyEmailTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task Verify_email_with_not_authenticated_user_returns_unauthorized()
     {
         // Arrange
-        Client.DefaultRequestHeaders.Remove(HeaderNames.Cookie);
+        Client.DefaultRequestHeaders.Authorization = null;
         var verifyEmailRequest = new VerifyEmail
         {
             Code = _code,

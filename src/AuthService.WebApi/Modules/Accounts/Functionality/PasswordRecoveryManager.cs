@@ -8,26 +8,26 @@ namespace AuthService.WebApi.Modules.Accounts.Functionality;
 
 public interface IPasswordRecoveryManager
 {
-    Task SendCode(long userId, string email);
-    Task<bool> Verify(long userId, string code);
-    Task RevokeCode(long userId);
+    Task SendCode(string email);
+    Task<bool> Verify(string email, string code);
+    Task RevokeCode(string email);
 }
 
 public class PasswordRecoveryManager(IOtpGenerator otpGenerator,
         IPasswordRecoveryCodeRepository codeRepository, IPasswordHasher hasher, IMessageBus bus)
     : IPasswordRecoveryManager
 {
-    public async Task SendCode(long userId, string email)
+    public async Task SendCode(string email)
     {
         var code = otpGenerator.Generate();
         var hashedCode = hasher.Hash(code);
         await bus.Publish(new SendPasswordRecovery { Email = email, Code = code, CodeExpirationMinutes = PasswordRecoveryCodeRepository.CodeExpirationMinutes });
-        await codeRepository.Save(userId, hashedCode);
+        await codeRepository.Save(email, hashedCode);
     }
 
-    public async Task<bool> Verify(long userId, string code)
+    public async Task<bool> Verify(string email, string code)
     {
-        var savedHashedCode = await codeRepository.Get(userId);
+        var savedHashedCode = await codeRepository.Get(email);
 
         if (savedHashedCode is null)
         {
@@ -37,44 +37,38 @@ public class PasswordRecoveryManager(IOtpGenerator otpGenerator,
         return hasher.Verify(code, savedHashedCode);
     }
 
-    public Task RevokeCode(long userId)
+    public Task RevokeCode(string email)
     {
-        return codeRepository.Remove(userId);
+        return codeRepository.Remove(email);
     }
 }
 
 public interface IPasswordRecoveryCodeRepository
 {
-    Task Save(long userId, string token);
-    Task<string?> Get(long userId);
-    Task Remove(long userId);
+    Task Save(string email, string token);
+    Task<string?> Get(string email);
+    Task Remove(string email);
 }
 
-public class PasswordRecoveryCodeRepository : IPasswordRecoveryCodeRepository
+public class PasswordRecoveryCodeRepository(ICacher cacher) : IPasswordRecoveryCodeRepository
 {
-    private readonly ICacher _cacher;
     public const int CodeExpirationMinutes = 30;
 
-    public PasswordRecoveryCodeRepository(ICacher cacher)
-    {
-        _cacher = cacher;
-    }
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static string BuildKey(long userId) => $"accounts:password-recovery:{userId}";
+    private static string BuildKey(string email) => $"accounts:password-recovery:{email}";
 
-    public async Task Save(long userId, string token)
+    public async Task Save(string email, string token)
     {
-        await _cacher.Set(BuildKey(userId), token, TimeSpan.FromMinutes(CodeExpirationMinutes));
+        await cacher.Set(BuildKey(email), token, TimeSpan.FromMinutes(CodeExpirationMinutes));
     }
 
-    public async Task<string?> Get(long userId)
+    public async Task<string?> Get(string email)
     {
-        return await _cacher.Get<string>(BuildKey(userId));
+        return await cacher.Get<string>(BuildKey(email));
     }
 
-    public Task Remove(long userId)
+    public Task Remove(string email)
     {
-        return _cacher.Remove(BuildKey(userId));
+        return cacher.Remove(BuildKey(email));
     }
 }

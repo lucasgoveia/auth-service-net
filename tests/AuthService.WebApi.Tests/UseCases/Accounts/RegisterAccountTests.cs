@@ -92,7 +92,7 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
     }
 
     [Fact]
-    public async Task Register_account_should_set_limited_token_cookie()
+    public async Task Register_account_should_return_access_token()
     {
         // Arrange
         var registerAccountRequest = new RegisterAccount
@@ -104,11 +104,11 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
 
         // Act
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
-
+        var resContent = await res.Content.ReadFromJsonAsync<RegisterAccountResponse>();
+        
         // Assert
         res.Should().BeSuccessful();
-        res.GetCookies().Should().Contain(x =>
-            x.Name == AuthCookieNames.LimitedAccessToken && !string.IsNullOrEmpty(x.Value));
+        resContent!.AccessToken.Should().NotBeNullOrEmpty();
     }
 
     [Fact]

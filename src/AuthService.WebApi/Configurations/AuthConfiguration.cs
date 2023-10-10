@@ -1,5 +1,4 @@
 ﻿using AuthService.WebApi.Common.Auth;
-using AuthService.WebApi.Common.Auth.Requirements;
 using AuthService.WebApi.Common.Devices;
 using Microsoft.AspNetCore.Authorization;
 
@@ -23,8 +22,8 @@ public static class AuthConfiguration
                 null)
             .AddScheme<RefreshTokenAuthenticationOptions, RefreshTokenAuthenticationHandler>(
                 RefreshTokenAuthentication.Scheme, null)
-            .AddScheme<LimitedSessionAuthenticationOptions, LimitedSessionAuthenticationHandler>(
-                LimitedSessionAuthentication.Scheme, null);
+            .AddScheme<ResetPasswordJwtAuthenticationOptions, ResetPasswordJwtAuthenticationHandler>(
+                ResetPasswordJwtAuthentication.Scheme, null);
 
         builder.Services
             .AddAuthorization(options =>
@@ -34,7 +33,5 @@ public static class AuthConfiguration
                     .RequireAuthenticatedUser()
                     .Build();
             });
-
-        builder.Services.AddScoped<IAuthorizationHandler, RecoverCodeVerifiedHandler>();
     }
 }

@@ -14,7 +14,7 @@ services:
     networks:
       - intranet
     restart: unless-stopped
-    
+  
   redis:
     image: redis
     ports:
@@ -22,14 +22,14 @@ services:
     networks:
       - intranet
     restart: unless-stopped
-    
+  
   amqp:
     image: cloudamqp/lavinmq
     ports:
       - "15672:15672"
       - "5672:5672"
     networks:
-        - intranet
+      - intranet
     restart: unless-stopped
   
   smtp4dev:
@@ -41,6 +41,18 @@ services:
       - intranet
     restart: unless-stopped
   
+  permify:
+    image: ghcr.io/permify/permify:latest
+    command: serve
+    ports:
+      - '3476:3476'
+      - '3478:3478'
+    volumes:
+      - './:/config'
+    networks:
+      - intranet
+    restart: unless-stopped
+
 networks:
   intranet:
 

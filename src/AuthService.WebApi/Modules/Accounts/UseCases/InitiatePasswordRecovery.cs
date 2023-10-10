@@ -22,20 +22,18 @@ public class InitiatePasswordRecoveryValidator : AbstractValidator<InitiatePassw
 }
 
 public class InitiatePasswordRecoveryHandler(IPasswordRecoveryManager passwordRecoveryManager,
-    IAuthenticationService authenticationService, IDbConnection dbConnection)
+    IDbConnection dbConnection)
 {
     public async Task<Result> Handle(InitiatePasswordRecovery request, CancellationToken ct)
     {
-        var info = await dbConnection.QuerySingleOrDefaultAsync<(long userId, long identityId)?>(
-            $"SELECT user_id, id FROM {TableNames.Identities} WHERE username = @Email", request);
+        var identityExists = await dbConnection.QuerySingleOrDefaultAsync<bool>(
+            $"SELECT 1 FROM {TableNames.Identities} WHERE username = @Email", request);
 
-        if (!info.HasValue)
+        if (!identityExists)
             return SuccessResult.Success();
 
-        var (userId, identityId) = info.Value;
-        
-        await passwordRecoveryManager.SendCode(userId, request.Email);
-        await authenticationService.AuthenticateLimited(userId, identityId, ct);
+        await passwordRecoveryManager.SendCode(request.Email);
+
         return SuccessResult.Success();
     }
 }

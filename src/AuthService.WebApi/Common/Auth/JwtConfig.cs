@@ -10,4 +10,6 @@ public record JwtConfig
     public required int RefreshTokenInTrustedDevicesHoursLifetime { get; init; }
     public required int RefreshTokenAllowedRenewsCount { get; init; }
     public required string Issuer { get; init; }
+    public required int ResetPasswordTokenMinutesLifetime { get; init; }
+    public required string ResetPasswordTokenSecret { get; init; }
 }

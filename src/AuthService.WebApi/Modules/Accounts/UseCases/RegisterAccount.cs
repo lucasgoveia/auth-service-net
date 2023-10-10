@@ -18,6 +18,11 @@ public record RegisterAccount
     public required string? Name { get; init; }
 }
 
+public record RegisterAccountResponse
+{
+    public required string AccessToken { get; init; }
+}
+
 public class RegisterAccountValidator : AbstractValidator<RegisterAccount>
 {
     public RegisterAccountValidator(IUsernameAvailabilityChecker checker, IPasswordPolicy passwordPolicy)
@@ -41,7 +46,7 @@ public sealed class RegisterAccountHandler(INewAccountSaver saver, UtcNow utcNow
     IEmailVerificationManager emailVerificationManager, GenerateId generateId,
     IAuthenticationService authenticationService)
 {
-    public async Task<Result> Handle(RegisterAccount req, CancellationToken ct = default)
+    public async Task<Result<RegisterAccountResponse>> Handle(RegisterAccount req, CancellationToken ct = default)
     {
         var hashedPassword = passwordHasher.Hash(req.Password);
         var identityId = await generateId();
@@ -54,9 +59,9 @@ public sealed class RegisterAccountHandler(INewAccountSaver saver, UtcNow utcNow
 
         await emailVerificationManager.SendCode(userId, req.Email);
 
-        await authenticationService.AuthenticateLimited(userId, identityId, ct);
+        var token = await authenticationService.Authenticate(userId, identityId, true, ct);
 
-        return SuccessResult.Success();
+        return SuccessResult.Success(new RegisterAccountResponse { AccessToken = token });
     }
 }
 
@@ -65,29 +70,22 @@ public interface INewAccountSaver
     Task Save(User user, Identity identity);
 }
 
-public class NewAccountSaver : INewAccountSaver
+public class NewAccountSaver(IDbConnection dbConnection) : INewAccountSaver
 {
-    private readonly IDbConnection _dbConnection;
-
-    public NewAccountSaver(IDbConnection dbConnection)
-    {
-        _dbConnection = dbConnection;
-    }
-
     public async Task Save(User user, Identity identity)
     {
-        if (_dbConnection.State != ConnectionState.Open)
+        if (dbConnection.State != ConnectionState.Open)
         {
-            _dbConnection.Open();
+            dbConnection.Open();
         }
 
-        using var transaction = _dbConnection.BeginTransaction();
+        using var transaction = dbConnection.BeginTransaction();
 
-        await _dbConnection.ExecuteAsync(
+        await dbConnection.ExecuteAsync(
             $"INSERT INTO {TableNames.Users} (id, name, email, created_at, updated_at) VALUES (@Id, @Name, @Email, @CreatedAt, @UpdatedAt)",
             user);
 
-        await _dbConnection.ExecuteAsync(
+        await dbConnection.ExecuteAsync(
             @$"INSERT INTO {TableNames.Identities} (id, user_id, username, password_hash, created_at, updated_at) VALUES (@Id, @UserId, @Username, @PasswordHash, @CreatedAt, @UpdatedAt)",
             identity);
 

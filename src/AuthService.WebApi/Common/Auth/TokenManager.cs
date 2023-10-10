@@ -20,8 +20,8 @@ public interface ITokenManager
     Task RemoveRefreshToken();
     Task RevokeAccessToken();
     Task<RefreshTokenInfo?> GetRefreshTokenInfo();
-    void GenerateAndSetLimitedAccessToken(long userId, long identityId, string sessionSecret, TimeSpan lifetime);
-    void RemoveLimitedAccessToken();
+    string GenerateResetPasswordAccessToken(long userId, long identityId);
+    Task RevokeUserAccessTokens(long userId);
 }
 
 public record RefreshTokenInfo
@@ -43,6 +43,10 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static string BuildRevokedAccessTokenKey(long accountId, string accessToken) =>
         $"accounts:{accountId}:revoked-access-tokens:{accessToken}";
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static string BuildGlobalAccessTokenRevocationKey(long accountId) =>
+        $"accounts:{accountId}:last-global-access-token-revocation";
 
     private TimeSpan GetRefreshTokenLifetime(bool trustedDevice)
     {
@@ -112,7 +116,18 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
 
     public async Task<bool> IsAccessTokenRevoked(long userId, string accessToken, CancellationToken ct = default)
     {
-        return await cacher.Get<bool?>(BuildRevokedAccessTokenKey(userId, accessToken)) ?? false;
+        var token = ReadToken(accessToken);
+        var tokenRevoked = await cacher.Get<bool?>(BuildRevokedAccessTokenKey(userId, token.Id)) ?? false;
+
+        if (tokenRevoked)
+            return true;
+        
+        var lastGlobalRevocation = await cacher.Get<DateTime?>(BuildGlobalAccessTokenRevocationKey(userId));
+        
+        if (lastGlobalRevocation is null)
+            return false;
+        
+        return token.ValidFrom < lastGlobalRevocation;
     }
 
     private string? GetRefreshTokenFromCookie()
@@ -136,11 +151,16 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
         httpContextAccessor.HttpContext!.Response.Cookies.Delete(AuthCookieNames.RefreshTokenCookieName);
         await cacher.Remove(BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken));
     }
+    
+    private JwtSecurityToken ReadToken(string token)
+    {
+        return new JwtSecurityTokenHandler().ReadJwtToken(token);
+    }
 
     public async Task RevokeAccessToken()
     {
-        var session = (await sessionManager.GetActiveSession())!;
-        await cacher.Set(BuildRevokedAccessTokenKey(session.UserId, GetAccessToken()), true,
+        var token = ReadToken(GetAccessToken());
+        await cacher.Set(BuildRevokedAccessTokenKey(sessionManager.UserId!.Value, token.Id), true,
             TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
     }
 
@@ -154,30 +174,22 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
         return await cacher.Get<RefreshTokenInfo>(
             BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken));
     }
-
-    public void GenerateAndSetLimitedAccessToken(long userId, long identityId, string sessionSecret, TimeSpan lifetime)
-    {
-        var token = GenerateSymmetricToken(userId, identityId, sessionSecret, lifetime);
-
-        httpContextAccessor.HttpContext!.Response.Cookies.Append(AuthCookieNames.LimitedAccessToken, token,
-            new CookieOptions
-            {
-                Secure = true,
-                Path = "/",
-                HttpOnly = true,
-                Expires = utcNow().Add(lifetime),
-                MaxAge = lifetime
-            });
-    }
-
-    public void RemoveLimitedAccessToken()
-    {
-        httpContextAccessor.HttpContext!.Response.Cookies.Delete(AuthCookieNames.LimitedAccessToken);
-    }
-
+    
     public string GenerateAccessToken(long userId, long identityId)
     {
         return GenerateAsymmetricToken(userId, identityId, TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
+    }
+
+    public string GenerateResetPasswordAccessToken(long userId, long identityId)
+    {
+        return GenerateSymmetricToken(userId, identityId, _jwtConfig.ResetPasswordTokenSecret,
+            TimeSpan.FromMinutes(_jwtConfig.ResetPasswordTokenMinutesLifetime));
+    }
+
+    public Task RevokeUserAccessTokens(long userId)
+    {
+        return cacher.Set(BuildGlobalAccessTokenRevocationKey(userId), utcNow(),
+            TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
     }
 
     private string GenerateRefreshToken(long userId, long identityId, string sessionSecret, TimeSpan lifetime)
@@ -228,7 +240,7 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
         {
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim(CustomJwtClaimsNames.IdentityId, identityId.ToString()),
-            new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64)
+            new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64),
         };
 
         var expiry = utcNow().Add(lifetime);

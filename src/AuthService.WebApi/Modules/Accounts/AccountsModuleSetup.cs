@@ -1,7 +1,6 @@
 ﻿using AuthService.Common.Security;
 using AuthService.WebApi.Common;
 using AuthService.WebApi.Common.Auth;
-using AuthService.WebApi.Common.Auth.Requirements;
 using AuthService.WebApi.Common.ResultExtensions;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using AuthService.WebApi.Modules.Accounts.UseCases;
@@ -59,11 +58,7 @@ public static class AccountsModuleSetup
                         [FromServices] RequestPipe pipe, CancellationToken ct) =>
                     (await pipe.Pipe(req, handler.Handle, ct)).ToApiResult()
             )
-            .RequireAuthorization(b =>
-            {
-                b.AuthenticationSchemes = new[] { CustomJwtAuthentication.Scheme, LimitedSessionAuthentication.Scheme };
-                b.RequireAuthenticatedUser();
-            });
+            .RequireAuthorization();
 
         builder.MapPost("accounts/initiate-email-verification",
                 async ([FromServices] InitiateEmailVerificationHandler handler, [FromServices] RequestPipe pipe,
@@ -101,11 +96,7 @@ public static class AccountsModuleSetup
                     [FromServices] RequestPipe pipe, [FromBody] VerifyPasswordRecoveryCode req, CancellationToken ct) =>
                 (await pipe.Pipe(req, handler.Handle, ct)).ToApiResult()
             )
-            .RequireAuthorization(b =>
-            {
-                b.AuthenticationSchemes = new[] { LimitedSessionAuthentication.Scheme };
-                b.RequireAuthenticatedUser();
-            });
+            .AllowAnonymous();
 
         builder.MapPost("accounts/reset-password", async (
                     [FromServices] ResetPasswordHandler handler,
@@ -114,8 +105,7 @@ public static class AccountsModuleSetup
             )
             .RequireAuthorization(b =>
             {
-                b.AuthenticationSchemes = new[] { LimitedSessionAuthentication.Scheme };
-                b.AddRequirements(RecoverCodeVerified.Instance);
+                b.AuthenticationSchemes = new[] { ResetPasswordJwtAuthentication.Scheme };
                 b.RequireAuthenticatedUser();
             });
 

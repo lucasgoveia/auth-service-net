@@ -15,8 +15,6 @@ public interface IAuthenticationService
     Task<Result<string>> LogIn(string username, string password, bool rememberMe, CancellationToken ct = default);
     Task LogOut(CancellationToken ct = default);
     Task LogOutAllSessions(CancellationToken ct);
-    Task AuthenticateLimited(long userId, long identityId, CancellationToken ct = default);
-
     Task<string> Authenticate(long userId, long identityId, bool rememberMe,
         CancellationToken ct = default);
 }
@@ -28,13 +26,6 @@ public class AuthenticationService(IIdentityForLoginGetter identityForLoginGette
         ITokenManager tokenManager, IMessageBus messageBus, UtcNow utcNow)
     : IAuthenticationService
 {
-    public async Task AuthenticateLimited(long userId, long identityId, CancellationToken ct = default)
-    {
-        var device = deviceIdentifier.Identify();
-        var session = await sessionManager.CreateLimitedSession(userId, identityId, device);
-
-        tokenManager.GenerateAndSetLimitedAccessToken(userId, identityId, session.SessionSecret, TimeSpan.FromMinutes(15));
-    }
 
     public async Task<string> Authenticate(long userId, long identityId, bool rememberMe,
         CancellationToken ct = default)
@@ -81,6 +72,7 @@ public class AuthenticationService(IIdentityForLoginGetter identityForLoginGette
 
     public async Task LogOutAllSessions(CancellationToken ct)
     {
+        await tokenManager.RevokeUserAccessTokens(sessionManager.UserId!.Value);
         await sessionManager.TerminateAllSessions();
     }
 }

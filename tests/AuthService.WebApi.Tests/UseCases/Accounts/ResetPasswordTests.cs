@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using AngleSharp.Io;
 using AuthService.WebApi.Common.Auth;
@@ -14,7 +15,6 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
 {
     private const string TestEmail = "test@example.com";
     private const string TestPassword = "Test1234!_345ax1";
-    private string _code = null!;
 
     public ResetPasswordTests(IntegrationTestFactory factory) : base(factory)
     {
@@ -39,20 +39,21 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
         });
         res.EnsureSuccessStatusCode();
 
-        var cookies = res.Headers.GetValues(HeaderNames.SetCookie).ToArray();
-        Client.DefaultRequestHeaders.Add(HeaderNames.Cookie, cookies);
-        _code = MessageBus.Messages.OfType<SendPasswordRecovery>().First().Code;
+        var code = MessageBus.Messages.OfType<SendPasswordRecovery>().First().Code;
+        res = await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
+        {
+            Email = TestEmail,
+            Code = code
+        });
+        res.EnsureSuccessStatusCode();
+        
+        var token = (await res.Content.ReadFromJsonAsync<VerifyPasswordRecoveryCodeResponse>())!.ResetToken;
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
     [Fact]
     public async Task ResetPassword_after_code_verification_should_return_ok()
     {
-        // Arrange
-        await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
-        {
-            Code = _code
-        });
-
         // Act
         var res = await Client.PostAsJsonAsync("/accounts/reset-password", new ResetPassword
         {
@@ -63,26 +64,22 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
     }
 
     [Fact]
-    public async Task ResetPassword_with_not_verified_code_should_return_forbidden()
+    public async Task ResetPassword_with_not_verified_code_should_return_unauthorized()
     {
+        Client.DefaultRequestHeaders.Authorization = null;
+        
         // Act
         var res = await Client.PostAsJsonAsync("/accounts/reset-password", new ResetPassword
         {
             NewPassword = "NewPassword123!_345ax1"
         });
 
-        res.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
     public async Task ResetPassword_with_password_that_doesnt_comply_to_policy_should_return_bad_request()
     {
-        // Arrange
-        await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
-        {
-            Code = _code
-        });
-
         // Act
         var res = await Client.PostAsJsonAsync("/accounts/reset-password", new ResetPassword
         {
@@ -93,40 +90,27 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
     }
 
     [Fact]
-    public async Task ResetPassword_after_password_reset_should_terminate_limited_session()
+    public async Task ResetPassword_after_password_reset_should_revoke_token()
     {
-        // Arrange
-        await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
-        {
-            Code = _code
-        });
-
         // Act
         var res = await Client.PostAsJsonAsync("/accounts/reset-password", new ResetPassword
         {
             NewPassword = "NewPassword123!_345ax1"
         });
+        res.EnsureSuccessStatusCode();
 
         // Assert
-        res.GetCookies()
-            .Should()
-            .Contain(x => x.Name == AuthCookieNames.SessionId && string.IsNullOrEmpty(x.Value) &&
-                          x.Expires < DateTimeHolder.MockedUtcNow);
-        res.GetCookies()
-            .Should()
-            .Contain(x => x.Name == AuthCookieNames.LimitedAccessToken && string.IsNullOrEmpty(x.Value) &&
-                          x.Expires < DateTimeHolder.MockedUtcNow);
+        res = await Client.PostAsJsonAsync("/accounts/reset-password", new ResetPassword
+        {
+            NewPassword = "NewPassword123!_345ax1"
+        });
+
+        res.Should().HaveStatusCode(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
     public async Task ResetPassword_should_allow_login_with_new_password()
     {
-        // Arrange
-        await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
-        {
-            Code = _code
-        });
-
         // Act
         var resetRequest = new ResetPassword
         {
@@ -147,12 +131,6 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
     [Fact]
     public async Task ResetPassword_should_not_allow_login_with_old_password()
     {
-        // Arrange
-        await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
-        {
-            Code = _code
-        });
-
         // Act
         var resetRequest = new ResetPassword
         {
@@ -190,11 +168,6 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
             otherSessionsRefreshToken.Add(res.Headers.GetValues(HeaderNames.SetCookie).ToArray());
         }
         
-        await Client.PostAsJsonAsync("/accounts/verify-password-recovery-code", new VerifyPasswordRecoveryCode
-        {
-            Code = _code
-        });
-
         // Act
         var resetRequest = new ResetPassword
         {

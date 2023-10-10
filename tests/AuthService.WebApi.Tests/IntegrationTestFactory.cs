@@ -58,6 +58,10 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
         Environment.SetEnvironmentVariable("JwtConfiguration__RefreshTokenInTrustedDevicesHoursLifetime", "48");
         Environment.SetEnvironmentVariable("JwtConfiguration__RefreshTokenAllowedRenewsCount", "4");
         Environment.SetEnvironmentVariable("JwtConfiguration__Issuer", "http://localhost:7101");
+        Environment.SetEnvironmentVariable("JwtConfiguration__ResetPasswordTokenMinutesLifetime", "15");
+        Environment.SetEnvironmentVariable("JwtConfiguration__ResetPasswordTokenSecret", "RESET_VERY_SECURE_SECRET________SOME_MORE_BYTES_HERE");
+        Environment.SetEnvironmentVariable("Cors__AllowedOrigins__0", "http://localhost:7101");
+        
         builder.ConfigureServices(services =>
             {
                 var servicesToRemove = new List<Type>
