@@ -1,0 +1,35 @@
+name: Trigger auto deployment for auth-service
+
+# When this action will be executed
+on:
+  release:
+
+  workflow_dispatch:
+      
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AUTHSERVICE_AZURE_CREDENTIALS }}
+
+      - name: Build and push container image to registry
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          appSourcePath: ${{ github.workspace }} 
+          registryUrl: myappsrepolg.azurecr.io
+          registryUsername: ${{ secrets.AUTHSERVICE_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.AUTHSERVICE_REGISTRY_PASSWORD }}
+          containerAppName: auth-service
+          resourceGroup: my-apps-group
+          imageToBuild: myappsrepolg.azurecr.io/auth-service:${{ github.sha }}
+          dockerfilePath: Dockerfile
+
+     
+
