@@ -177,7 +177,8 @@ public class SessionManager : ISessionManager
                 Path = "/",
                 HttpOnly = true,
                 Expires = _session.EndedAt,
-                MaxAge = lifetime
+                MaxAge = lifetime,
+                SameSite = SameSiteMode.None
             });
 
         SessionId = sessionId;

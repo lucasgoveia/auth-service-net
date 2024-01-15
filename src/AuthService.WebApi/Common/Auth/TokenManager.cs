@@ -81,7 +81,8 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
                 Path = "/",
                 HttpOnly = true,
                 Expires = utcNow().Add(expiration),
-                MaxAge = expiration
+                MaxAge = expiration,
+                SameSite = SameSiteMode.None
             });
     }
 
