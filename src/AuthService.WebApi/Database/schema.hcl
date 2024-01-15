@@ -150,7 +150,7 @@ table "user_sessions" {
   }
   column "ip_address" {
     null = false
-    type = varchar(15)
+    type = varchar(50)
   }
   column "user_agent" {
     null = false
