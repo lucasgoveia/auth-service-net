@@ -62,6 +62,8 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
         Environment.SetEnvironmentVariable("JwtConfiguration__ResetPasswordTokenSecret", "RESET_VERY_SECURE_SECRET________SOME_MORE_BYTES_HERE");
         Environment.SetEnvironmentVariable("Cors__AllowedOrigins__0", "http://localhost:7101");
         
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", GetConnectionString(_postgresqlContainer));
+        
         builder.ConfigureServices(services =>
             {
                 var servicesToRemove = new List<Type>

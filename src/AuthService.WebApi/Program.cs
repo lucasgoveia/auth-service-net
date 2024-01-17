@@ -19,7 +19,6 @@ builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection")!)
     .AddRedis(builder.Configuration.GetConnectionString("RedisConnection")!);
 
-
 builder.AddCommonServices();
 builder.AddBusSetup();
 builder.AddCaching();
@@ -34,7 +33,6 @@ builder.Host.AddMailingSetup();
 
 builder.Services.AddAccountsFunctionality();
 builder.Services.AddAuthFunctionality();
-
 
 var app = builder.Build();
 
