@@ -31,7 +31,7 @@ public record RefreshTokenInfo
 }
 
 public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISessionManager sessionManager,
-        IHttpContextAccessor httpContextAccessor, ICacher cacher)
+        IHttpContextAccessor httpContextAccessor, ICacher cacher, RsaKeyHolder rsaKeyHolder)
     : ITokenManager
 {
     private readonly JwtConfig _jwtConfig = jwtConfig.Value;
@@ -226,11 +226,8 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
 
     private string GenerateAsymmetricToken(long userId, long identityId, TimeSpan lifetime)
     {
-        var privateKeyBytes = Convert.FromBase64String(_jwtConfig.AccessTokenPrivateKey);
-        using var rsa = RSA.Create(4096);
-        rsa.ImportRSAPrivateKey(privateKeyBytes, out _);
-
-        var securityKey = new RsaSecurityKey(rsa);
+        var securityKey = rsaKeyHolder.GetPrivateKey();
+        
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.RsaSha256Signature)
         {
             CryptoProviderFactory = new CryptoProviderFactory { CacheSignatureProviders = false }

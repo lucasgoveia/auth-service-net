@@ -10,6 +10,7 @@ public static class AuthConfiguration
     public static void AddAuthSetup(this WebApplicationBuilder builder)
     {
         builder.Services.Configure<JwtConfig>(builder.Configuration.GetSection("JwtConfiguration"));
+        builder.Services.AddSingleton<RsaKeyHolder>();
         builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
         builder.Services.AddScoped<IIdentityForLoginGetter, IdentityForLoginGetter>();
         builder.Services.AddScoped<IDeviceIdentifier, DeviceIdentifier>();

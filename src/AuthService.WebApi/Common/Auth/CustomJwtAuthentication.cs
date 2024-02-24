@@ -24,7 +24,7 @@ public class CustomJwtAuthenticationOptions : AuthenticationSchemeOptions
 
 public class CustomJwtAuthenticationHandler(IOptionsMonitor<CustomJwtAuthenticationOptions> options,
         ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock, IOptions<JwtConfig> jwtConfig,
-        UtcNow utcNow, ITokenManager tokenManager)
+        RsaKeyHolder rsaKeyHolder, UtcNow utcNow, ITokenManager tokenManager)
     : AuthenticationHandler<CustomJwtAuthenticationOptions>(options, logger, encoder, clock)
 {
     private readonly JwtConfig _jwtConfig = jwtConfig.Value;
@@ -50,11 +50,7 @@ public class CustomJwtAuthenticationHandler(IOptionsMonitor<CustomJwtAuthenticat
 
     private async Task<(JwtSecurityToken?, bool)> ValidateToken(string token)
     {
-        var publicKeyBytes = Convert.FromBase64String(_jwtConfig.AccessTokenPublicKey);
-        using var rsa = RSA.Create(4096);
-        rsa.ImportRSAPublicKey(publicKeyBytes, out _);
-        
-        var key = new RsaSecurityKey(rsa);
+        var key = rsaKeyHolder.GetPublicKey();
 
         var tokenHandler = new JwtSecurityTokenHandler();
 
