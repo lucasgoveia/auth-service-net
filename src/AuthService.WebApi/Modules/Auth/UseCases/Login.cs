@@ -30,7 +30,6 @@ public class LoginHandler(IAuthenticationService authenticationService)
     public async Task<Result<LoginResponse>> Handle(Login req, CancellationToken ct = default)
     {
         var result = await authenticationService.LogIn(req.Username, req.Password, req.RememberMe, ct);
-
         return result.Map(accessToken => new LoginResponse { AccessToken = accessToken });
     }
 }

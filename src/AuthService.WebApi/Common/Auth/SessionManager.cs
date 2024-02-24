@@ -62,6 +62,7 @@ public class SessionManager : ISessionManager
     private readonly ISessionRepository _sessionRepository;
     private Session? _session;
     private readonly ICacher _cacher;
+    private readonly ILogger<SessionManager> _logger;
 
     private long? _userId;
     private long? _identityId;
@@ -108,13 +109,14 @@ public class SessionManager : ISessionManager
     }
 
     public SessionManager(ISecureKeyGenerator keyGenerator, IHttpContextAccessor httpContextAccessor,
-        UtcNow utcNow, ISessionRepository sessionRepository, ICacher cacher)
+        UtcNow utcNow, ISessionRepository sessionRepository, ICacher cacher, ILogger<SessionManager> logger)
     {
         _keyGenerator = keyGenerator;
         _httpContextAccessor = httpContextAccessor;
         _utcNow = utcNow;
         _sessionRepository = sessionRepository;
         _cacher = cacher;
+        _logger = logger;
 
         if (httpContextAccessor.HttpContext?.Request.Cookies.TryGetValue(AuthCookieNames.SessionId,
                 out var sessionId) ?? false)
@@ -126,8 +128,6 @@ public class SessionManager : ISessionManager
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static string BuildSessionPropKey(long userId, string sessionId, string propName) =>
         $"accounts:{userId}:sessions:{sessionId}:{propName}";
-    
-    
     
     public async Task AddSessionProperty<T>(string name, T value)
     {
@@ -147,6 +147,7 @@ public class SessionManager : ISessionManager
 
     public async Task<Session> CreateSession(long userId, long identityId, DeviceDto device, bool trustedDevice = false)
     {
+        _logger.LogInformation("creating session for user {userId} with IP {device.IpAddress}", userId, device.IpAddress);
         return await CreateSession(userId, identityId, device, trustedDevice, lifetime: null);
     }
     
@@ -213,6 +214,8 @@ public class SessionManager : ISessionManager
 
     public async Task TerminateSession()
     {
+        _logger.LogInformation("terminating session for user {userId}", UserId!.Value);
+        
         if (SessionId is null)
             return;
 
@@ -223,6 +226,8 @@ public class SessionManager : ISessionManager
 
     public async Task TerminateAllSessions()
     {
+        _logger.LogInformation("terminating all sessions for user {userId}", UserId!.Value);
+        
         if (UserId is null)
             return;
 

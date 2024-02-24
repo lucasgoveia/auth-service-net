@@ -15,18 +15,22 @@ public interface IAuthenticationService
     Task<Result<string>> LogIn(string username, string password, bool rememberMe, CancellationToken ct = default);
     Task LogOut(CancellationToken ct = default);
     Task LogOutAllSessions(CancellationToken ct);
+
     Task<string> Authenticate(long userId, long identityId, bool rememberMe,
         CancellationToken ct = default);
 }
 
-public class AuthenticationService(IIdentityForLoginGetter identityForLoginGetter,
-        IPasswordHasher passwordHasher,
-        IDeviceIdentifier deviceIdentifier,
-        ISessionManager sessionManager,
-        ITokenManager tokenManager, IMessageBus messageBus, UtcNow utcNow)
+public class AuthenticationService(
+    IIdentityForLoginGetter identityForLoginGetter,
+    IPasswordHasher passwordHasher,
+    IDeviceIdentifier deviceIdentifier,
+    ISessionManager sessionManager,
+    ITokenManager tokenManager,
+    IMessageBus messageBus,
+    UtcNow utcNow,
+    ILogger<AuthenticationService> logger)
     : IAuthenticationService
 {
-
     public async Task<string> Authenticate(long userId, long identityId, bool rememberMe,
         CancellationToken ct = default)
     {
@@ -43,6 +47,7 @@ public class AuthenticationService(IIdentityForLoginGetter identityForLoginGette
     public async Task<Result<string>> LogIn(string username, string password, bool rememberMe,
         CancellationToken ct = default)
     {
+        logger.LogInformation("user {username} is logging in", username);
         var identity = await identityForLoginGetter.Get(username, utcNow(), ct);
 
         if (identity is null)
@@ -52,11 +57,13 @@ public class AuthenticationService(IIdentityForLoginGetter identityForLoginGette
 
         if (!correctCredentials)
         {
+            logger.LogInformation("{username} login attempt failed", username);
             await messageBus.Publish(new LoginAttemptFailed { UserId = identity.UserId }, ct);
             return ErrorResult.Unauthorized();
         }
 
         var accessToken = await Authenticate(identity.UserId, identity.Id, rememberMe, ct);
+        logger.LogInformation("{username} login attempt succeed", username);
 
         await messageBus.Publish(new LoginAttemptSucceed { UserId = identity.UserId }, ct);
         return SuccessResult.Success(accessToken);
@@ -68,12 +75,14 @@ public class AuthenticationService(IIdentityForLoginGetter identityForLoginGette
         await tokenManager.RemoveRefreshToken();
         await tokenManager.RevokeAccessToken();
         await sessionManager.TerminateSession();
+        logger.LogInformation("user logged out");
     }
 
     public async Task LogOutAllSessions(CancellationToken ct)
     {
         await tokenManager.RevokeUserAccessTokens(sessionManager.UserId!.Value);
         await sessionManager.TerminateAllSessions();
+        logger.LogInformation("user logged out of all sessions");
     }
 }
 

@@ -31,7 +31,7 @@ public record RefreshTokenInfo
 }
 
 public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISessionManager sessionManager,
-        IHttpContextAccessor httpContextAccessor, ICacher cacher, RsaKeyHolder rsaKeyHolder)
+        IHttpContextAccessor httpContextAccessor, ICacher cacher, RsaKeyHolder rsaKeyHolder, ILogger<TokenManager> logger)
     : ITokenManager
 {
     private readonly JwtConfig _jwtConfig = jwtConfig.Value;
@@ -65,6 +65,8 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
 
     private async Task GenerateAndSetRefreshToken(Session session, TimeSpan expiration)
     {
+        logger.LogInformation("Generating and setting refresh token for {userId} with {expiration}", session.UserId, expiration);
+        
         var refreshToken = GenerateRefreshToken(session.UserId, session.IdentityId,
             session.SessionSecret, expiration);
 
@@ -90,6 +92,8 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
     {
         var session = (await sessionManager.GetActiveSession())!;
         var refreshToken = httpContextAccessor.HttpContext!.Request.Cookies[AuthCookieNames.RefreshTokenCookieName]!;
+        
+        logger.LogInformation("Refreshing token for {userId}", session.UserId);
 
         var (info, expiry) =
             await cacher.GetWithExpiration<RefreshTokenInfo>(BuildRefreshTokenKey(session.UserId, session.SessionId,
@@ -97,20 +101,27 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
 
         if (info!.UsageCount + 1 == _jwtConfig.RefreshTokenAllowedRenewsCount)
         {
+            logger.LogInformation("User refreshed with current token too many times");
+            
             var newExpiration = info.TrustedDevice
                 ? TimeSpan.FromHours(_jwtConfig.RefreshTokenInTrustedDevicesHoursLifetime)
                 : expiry.GetValueOrDefault();
 
+            logger.LogInformation("new refresh token expiration set to {newExpiration}", newExpiration);
+            
             await cacher.Remove(BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken));
             await GenerateAndSetRefreshToken(session, newExpiration);
+            logger.LogInformation("Generated new refresh token");
 
             var accessToken = GenerateAccessToken(session.UserId, session.IdentityId);
+            logger.LogInformation("Generated new access token");
             return SuccessResult.Success(accessToken);
         }
 
         await cacher.Set(BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken),
             info with { UsageCount = info.UsageCount + 1 },
             expiry);
+        logger.LogInformation("Generated new access token");
 
         return SuccessResult.Success(GenerateAccessToken(session.UserId, session.IdentityId));
     }
@@ -144,6 +155,7 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
 
     public async Task RemoveRefreshToken()
     {
+        logger.LogInformation("Removing refresh token");
         var refreshToken = GetRefreshTokenFromCookie();
         if (string.IsNullOrEmpty(refreshToken))
             return;
@@ -160,6 +172,8 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
 
     public async Task RevokeAccessToken()
     {
+        logger.LogInformation("Revoking {userId} access token", sessionManager.UserId!.Value);
+        
         var token = ReadToken(GetAccessToken());
         await cacher.Set(BuildRevokedAccessTokenKey(sessionManager.UserId!.Value, token.Id), true,
             TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
