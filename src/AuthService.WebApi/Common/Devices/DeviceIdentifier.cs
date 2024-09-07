@@ -12,7 +12,7 @@ public class DeviceIdentifier(IHttpContextAccessor httpContextAccessor) : IDevic
     public DeviceDto Identify()
     {
         var userAgent = httpContextAccessor.HttpContext!.Request.Headers["User-Agent"].ToString();
-        var fingerprint = httpContextAccessor.HttpContext!.Request.Headers["Device-Fingerprint"].ToString();
+        var fingerprint = httpContextAccessor.HttpContext!.Request.Headers["Fingerprint"].ToString();
         var ipAddress = httpContextAccessor.HttpContext!.Connection.RemoteIpAddress!.ToString();
 
         return new DeviceDto
