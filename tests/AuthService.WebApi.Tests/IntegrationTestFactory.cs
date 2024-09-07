@@ -62,7 +62,7 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
         Environment.SetEnvironmentVariable("JwtConfiguration__ResetPasswordTokenSecret", "RESET_VERY_SECURE_SECRET________SOME_MORE_BYTES_HERE");
         Environment.SetEnvironmentVariable("Cors__AllowedOrigins__0", "http://localhost:7101");
         
-        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", GetConnectionString(_postgresqlContainer));
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", _postgresqlContainer.GetConnectionString());
         
         builder.ConfigureServices(services =>
             {
@@ -86,25 +86,10 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
             .ConfigureLogging(o => o.AddFilter(loglevel => loglevel >= LogLevel.Warning));
         base.ConfigureWebHost(builder);
     }
-
-    private static string GetConnectionString(PostgreSqlContainer container)
-    {
-        var builder = new NpgsqlConnectionStringBuilder
-        {
-            Host = container.Hostname,
-            Database = "auth_service_test",
-            Username = "postgres",
-            Password = "DB_SECURE_PASSWORD",
-            Port = container.GetMappedPublicPort(5432),
-            MaxPoolSize = 3
-        };
-        
-        return builder.ToString();
-    }
     
     private void AddExtraServices(IServiceCollection services)
     {
-        services.AddScoped<IDbConnection>(_ => new NpgsqlConnection(GetConnectionString(_postgresqlContainer)));
+        services.AddScoped<IDbConnection>(_ => new NpgsqlConnection(_postgresqlContainer.GetConnectionString()));
         services.AddSingleton<IMessageBus, FakeMessageBus>();
         services.AddSingleton<IEmailSender>(_ => EmailSender);
         services.AddSingleton<FakeServerDateTimeHolder>();
@@ -142,7 +127,7 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
     public async Task InitializeAsync()
     {
         await _postgresqlContainer.StartAsync();
-        await using var connection = new NpgsqlConnection(GetConnectionString(_postgresqlContainer));
+        await using var connection = new NpgsqlConnection(_postgresqlContainer.GetConnectionString());
         await connection.OpenAsync();
 
         await MigrateDb(connection);
@@ -175,7 +160,7 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
 
     public async Task ResetDatabaseAsync()
     {
-        await using var conn = new NpgsqlConnection(GetConnectionString(_postgresqlContainer));
+        await using var conn = new NpgsqlConnection(_postgresqlContainer.GetConnectionString());
         await conn.OpenAsync();
         await _respawner.ResetAsync(conn);
     }
