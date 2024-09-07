@@ -40,18 +40,7 @@ services:
     networks:
       - intranet
     restart: unless-stopped
-  
-  permify:
-    image: ghcr.io/permify/permify:latest
-    command: serve
-    ports:
-      - '3476:3476'
-      - '3478:3478'
-    volumes:
-      - './:/config'
-    networks:
-      - intranet
-    restart: unless-stopped
+
 
 networks:
   intranet:
