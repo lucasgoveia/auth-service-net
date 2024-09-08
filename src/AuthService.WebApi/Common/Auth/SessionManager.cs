@@ -168,7 +168,7 @@ public class SessionManager : ISessionManager
             DeviceFingerprint = device.Fingerprint,
             CreatedAt = now,
             SessionSecret = GenerateJwtKey(),
-            EndedAt = lifetime.HasValue ? now.Add(lifetime.Value) : null
+            EndedAt = lifetime.HasValue ? now.Add(lifetime.Value) : now.AddYears(10)
         };
 
         _httpContextAccessor.HttpContext?.Response.Cookies.Append(AuthCookieNames.SessionId, sessionId,
