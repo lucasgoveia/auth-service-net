@@ -4,4 +4,4 @@ ENV DATABASE_URL=""
 
 COPY atlas/migrations /migrations 
 
-CMD ["migrate", "apply", "--dir", "file://migrations", "--url", "${DATABASE_URL}"]
+CMD ["migrate", "apply", "--dir", "file://migrations", "--url", "$DATABASE_URL"]
