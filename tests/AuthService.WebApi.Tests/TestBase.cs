@@ -26,13 +26,14 @@ public abstract class TestBase : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await Seed();
-    }
-
-    public async Task DisposeAsync()
-    {
         await Factory.ResetDatabaseAsync();
         await Factory.ResetCacheAsync();
         await Factory.ResetBusAsync();
+        await Seed();
+    }
+
+    public Task DisposeAsync()
+    {
+        return Task.CompletedTask;
     }
 }

@@ -183,6 +183,7 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
             {
                 DbAdapter = DbAdapter.Postgres,
                 SchemasToInclude = new[] { "iam" },
+                WithReseed = true
             });
     }
 
