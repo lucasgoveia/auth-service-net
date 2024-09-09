@@ -1,12 +1,12 @@
 ﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using AngleSharp.Io;
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Modules.Auth.UseCases;
 using AuthService.WebApi.Tests.Utils;
 using FluentAssertions;
+using Microsoft.Net.Http.Headers;
 
 namespace AuthService.WebApi.Tests.UseCases.Auth;
 
@@ -32,14 +32,14 @@ public class LogOutTests : TestBase, IClassFixture<IntegrationTestFactory>
 
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
         res.EnsureSuccessStatusCode();
-        
+
         res = await Client.PostAsJsonAsync("/login", new Login
         {
             Password = registerAccountRequest.Password,
             Username = registerAccountRequest.Email,
             RememberMe = true,
         });
-        
+
         _accessToken = (await res.Content.ReadFromJsonAsync<LoginResponse>())!.AccessToken;
         _cookies = res.Headers.GetValues(HeaderNames.SetCookie).ToArray();
 

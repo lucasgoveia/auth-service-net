@@ -7,9 +7,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Dapper" Version="2.1.28" />
-      <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-      <PackageReference Include="StackExchange.Redis" Version="2.7.17" />
+      <PackageReference Include="Dapper" />
+      <PackageReference Include="Microsoft.Extensions.Hosting" />
+      <PackageReference Include="StackExchange.Redis" />
     </ItemGroup>
 
     <ItemGroup>
