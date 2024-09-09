@@ -35,7 +35,7 @@
     <ItemGroup>
         <Content Include="..\..\atlas\**\*">
             <Link>atlas\%(RecursiveDir)%(FileName)%(Extension)</Link>
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </Content>
     </ItemGroup>
 
