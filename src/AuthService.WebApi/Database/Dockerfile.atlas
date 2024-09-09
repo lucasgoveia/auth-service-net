@@ -1,3 +1,0 @@
-FROM arigaio/atlas:latest
-
-COPY src/AuthService.WebApi/Database/migrations /migrations

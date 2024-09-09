@@ -1,13 +1,11 @@
 ﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using AngleSharp.Io;
-using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Messages.Commands;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Modules.Auth.UseCases;
-using AuthService.WebApi.Tests.Utils;
 using FluentAssertions;
+using Microsoft.Net.Http.Headers;
 
 namespace AuthService.WebApi.Tests.UseCases.Accounts;
 
@@ -46,7 +44,7 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
             Code = code
         });
         res.EnsureSuccessStatusCode();
-        
+
         var token = (await res.Content.ReadFromJsonAsync<VerifyPasswordRecoveryCodeResponse>())!.ResetToken;
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
@@ -67,7 +65,7 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
     public async Task ResetPassword_with_not_verified_code_should_return_unauthorized()
     {
         Client.DefaultRequestHeaders.Authorization = null;
-        
+
         // Act
         var res = await Client.PostAsJsonAsync("/accounts/reset-password", new ResetPassword
         {
@@ -117,7 +115,7 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
             NewPassword = "NewPassword123!_345ax1"
         };
         await Client.PostAsJsonAsync("/accounts/reset-password", resetRequest);
-        
+
         // Assert
         var loginRes = await Client.PostAsJsonAsync("/login", new Login
         {
@@ -127,7 +125,7 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
         });
         loginRes.Should().BeSuccessful();
     }
-    
+
     [Fact]
     public async Task ResetPassword_should_not_allow_login_with_old_password()
     {
@@ -137,7 +135,7 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
             NewPassword = "NewPassword123!_345ax1"
         };
         await Client.PostAsJsonAsync("/accounts/reset-password", resetRequest);
-        
+
         // Assert
         var loginRes = await Client.PostAsJsonAsync("/login", new Login
         {
@@ -167,14 +165,14 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
 
             otherSessionsRefreshToken.Add(res.Headers.GetValues(HeaderNames.SetCookie).ToArray());
         }
-        
+
         // Act
         var resetRequest = new ResetPassword
         {
             NewPassword = "NewPassword123!_345ax1"
         };
         await Client.PostAsJsonAsync("/accounts/reset-password", resetRequest);
-        
+
         // Assert
         foreach (var refreshCookie in otherSessionsRefreshToken)
         {

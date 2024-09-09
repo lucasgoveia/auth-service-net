@@ -9,6 +9,8 @@ using AuthService.Mailing;
 using AuthService.WebApi.Common.Devices;
 using AuthService.WebApi.Tests.Fakes;
 using Dapper;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
 using MassTransit;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -138,14 +140,11 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
 
     public async Task MigrateDb(DbConnection conn)
     {
-        var assembly = typeof(IAssemblyMarker).Assembly;
-        var resources = assembly.GetManifestResourceNames();
-
-        var migrationsFiles = resources.Where(x => x.EndsWith(".sql")).ToList();
+        var migrationsFiles = Directory.GetFiles("atlas/migrations", "*.sql");
 
         foreach (var migrationFile in migrationsFiles)
         {
-            await using var stream = assembly.GetManifestResourceStream(migrationFile);
+            await using var stream = new FileStream(migrationFile, FileMode.Open, FileAccess.Read);
             using var reader = new StreamReader(stream!);
             var migrationSql = await reader.ReadToEndAsync();
 

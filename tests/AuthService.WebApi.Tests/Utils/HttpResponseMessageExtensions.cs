@@ -1,5 +1,5 @@
 ﻿using System.Net;
-using AngleSharp.Io;
+using Microsoft.Net.Http.Headers;
 
 namespace AuthService.WebApi.Tests.Utils;
 
@@ -22,8 +22,8 @@ public static class HttpResponseMessageExtensions
                 return new KeyValuePair<string, string>(split[0], split.Length > 1 ? split[1] : "");
             })
             .ToList();
-        
-        
+
+
         var name = cookieProperties.First().Key;
         var value = cookieProperties.First(x => x.Key == name).Value;
         var path = cookieProperties.First(x => x.Key == "path").Value;
@@ -32,13 +32,13 @@ public static class HttpResponseMessageExtensions
             Secure = cookieProperties.Any(x => x.Key == "secure"),
             HttpOnly = cookieProperties.Any(x => x.Key == "httponly"),
         };
-        
+
         if (cookieProperties.Any(x => x.Key == "expires"))
         {
             var expires = cookieProperties.First(x => x.Key == "expires").Value;
             cookie.Expires = DateTime.Parse(expires).ToUniversalTime();
         }
-        
+
         return cookie;
     }
 }
