@@ -1,40 +1,43 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>26fb5dcc-5220-4434-b3f9-fb42266d7e93</UserSecretsId>
-    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-  </PropertyGroup>
-  
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UserSecretsId>26fb5dcc-5220-4434-b3f9-fb42266d7e93</UserSecretsId>
+        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" />
-    <PackageReference Include="AspNetCore.HealthChecks.Redis" />
-    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" />
-    <PackageReference Include="BCrypt.Net-Next" />
-    <PackageReference Include="Dapper" />
-    <PackageReference Include="FluentValidation" />
-    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
-    <PackageReference Include="IdGen" />
-    <PackageReference Include="IdGen.DependencyInjection" />
-    <PackageReference Include="MassTransit.RabbitMQ" />
-    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
-    <PackageReference Include="Npgsql" />
-    <PackageReference Include="StackExchange.Redis" />
-    <PackageReference Include="Swashbuckle.AspNetCore" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <ProjectReference Include="..\AuthService.Common\AuthService.Common.csproj" />
-    <ProjectReference Include="..\AuthService.Consumers\AuthService.Consumers.csproj" />
-    <ProjectReference Include="..\AuthService.Mailing\AuthService.Mailing.csproj" />
-    <ProjectReference Include="..\AuthService.Messages\AuthService.Messages.csproj" />
-  </ItemGroup>
 
+    <ItemGroup>
+        <PackageReference Include="AspNetCore.HealthChecks.NpgSql"/>
+        <PackageReference Include="AspNetCore.HealthChecks.Redis"/>
+        <PackageReference Include="AspNetCore.HealthChecks.UI.Client"/>
+        <PackageReference Include="BCrypt.Net-Next"/>
+        <PackageReference Include="Dapper"/>
+        <PackageReference Include="FluentValidation"/>
+        <PackageReference Include="FluentValidation.DependencyInjectionExtensions"/>
+        <PackageReference Include="IdGen"/>
+        <PackageReference Include="IdGen.DependencyInjection"/>
+        <PackageReference Include="MassTransit.RabbitMQ"/>
+        <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore"/>
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer"/>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi"/>
+        <PackageReference Include="Npgsql"/>
+        <PackageReference Include="StackExchange.Redis"/>
+        <PackageReference Include="Swashbuckle.AspNetCore"/>
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\AuthService.Common\AuthService.Common.csproj"/>
+        <ProjectReference Include="..\AuthService.Consumers\AuthService.Consumers.csproj"/>
+        <ProjectReference Include="..\AuthService.Mailing\AuthService.Mailing.csproj"/>
+        <ProjectReference Include="..\AuthService.Messages\AuthService.Messages.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="atlas/**"/>
+    </ItemGroup>
 
 </Project>

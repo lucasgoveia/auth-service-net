@@ -31,12 +31,5 @@
     <ItemGroup>
       <ProjectReference Include="..\..\src\AuthService.WebApi\AuthService.WebApi.csproj" />
     </ItemGroup>
-    
-    <ItemGroup>
-        <Content Include="..\..\atlas\**\*">
-            <Link>atlas\%(RecursiveDir)%(FileName)%(Extension)</Link>
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </Content>
-    </ItemGroup>
 
 </Project>

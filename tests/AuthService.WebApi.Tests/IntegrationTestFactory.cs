@@ -140,11 +140,14 @@ public class IntegrationTestFactory : WebApplicationFactory<IAssemblyMarker>, IA
 
     public async Task MigrateDb(DbConnection conn)
     {
-        var migrationsFiles = Directory.GetFiles("atlas/migrations", "*.sql");
+        var assembly = typeof(IAssemblyMarker).Assembly;
+        var resources = assembly.GetManifestResourceNames();
+
+        var migrationsFiles = resources.Where(x => x.EndsWith(".sql")).ToList();
 
         foreach (var migrationFile in migrationsFiles)
         {
-            await using var stream = new FileStream(migrationFile, FileMode.Open, FileAccess.Read);
+            await using var stream = assembly.GetManifestResourceStream(migrationFile);
             using var reader = new StreamReader(stream!);
             var migrationSql = await reader.ReadToEndAsync();
 
