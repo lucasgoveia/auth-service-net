@@ -1,6 +1,8 @@
 ﻿using System.Data;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
+using AuthService.Common;
 using AuthService.Common.Caching;
 using AuthService.Common.Consts;
 using AuthService.Common.Security;
@@ -153,42 +155,47 @@ public class SessionManager : ISessionManager
     
     private async Task<Session> CreateSession(long userId, long identityId, DeviceDto device, bool trustedDevice, TimeSpan? lifetime)
     {
-        var sessionId = _keyGenerator.Generate(SessionIdAlphabet, SessionIdLength);
-
-        var now = _utcNow();
-
-        _session = new Session
+        return await ApiActivitySource.Instance.WithActivity(async activity =>
         {
-            SessionId = sessionId,
-            UserId = userId,
-            IdentityId = identityId,
-            IpAddress = device.IpAddress,
-            UserAgent = device.UserAgent,
-            TrustedDevice = trustedDevice,
-            DeviceFingerprint = device.Fingerprint,
-            CreatedAt = now,
-            SessionSecret = GenerateJwtKey(),
-            EndedAt = lifetime.HasValue ? now.Add(lifetime.Value) : now.AddYears(10)
-        };
+            var sessionId = _keyGenerator.Generate(SessionIdAlphabet, SessionIdLength);
 
-        _httpContextAccessor.HttpContext?.Response.Cookies.Append(AuthCookieNames.SessionId, sessionId,
-            new CookieOptions
+            var now = _utcNow();
+
+            _session = new Session
             {
-                Secure = true,
-                Path = "/",
-                HttpOnly = true,
-                Expires = _session.EndedAt,
-                MaxAge = lifetime,
-                SameSite = SameSiteMode.None
-            });
+                SessionId = sessionId,
+                UserId = userId,
+                IdentityId = identityId,
+                IpAddress = device.IpAddress,
+                UserAgent = device.UserAgent,
+                TrustedDevice = trustedDevice,
+                DeviceFingerprint = device.Fingerprint,
+                CreatedAt = now,
+                SessionSecret = GenerateJwtKey(),
+                EndedAt = lifetime.HasValue ? now.Add(lifetime.Value) : now.AddYears(10)
+            };
 
-        SessionId = sessionId;
-        UserId = userId;
-        IdentityId = identityId;
+            _httpContextAccessor.HttpContext?.Response.Cookies.Append(AuthCookieNames.SessionId, sessionId,
+                new CookieOptions
+                {
+                    Secure = true,
+                    Path = "/",
+                    HttpOnly = true,
+                    Expires = _session.EndedAt,
+                    MaxAge = lifetime,
+                    SameSite = SameSiteMode.None
+                });
+            activity?.AddEvent(new ActivityEvent("AddedSessionCookie", now));
 
-        await _sessionRepository.Add(_session);
+            SessionId = sessionId;
+            UserId = userId;
+            IdentityId = identityId;
 
-        return _session;
+            await _sessionRepository.Add(_session);
+            activity?.AddEvent(new ActivityEvent("SessionAddedToDb", now));
+
+            return _session;
+        });
     }
 
     public async Task<Session?> GetActiveSession()
@@ -219,7 +226,14 @@ public class SessionManager : ISessionManager
         if (SessionId is null)
             return;
 
-        _httpContextAccessor.HttpContext?.Response.Cookies.Delete(AuthCookieNames.SessionId);
+        _httpContextAccessor.HttpContext?.Response.Cookies.Delete(AuthCookieNames.SessionId, new CookieOptions
+        {
+            Secure = true,
+            Path = "/",
+            HttpOnly = true,
+            Expires = _utcNow().AddYears(-1),
+            SameSite = SameSiteMode.None
+        });
         await _sessionRepository.Delete(SessionId, _utcNow());
         await _cacher.ClearPattern(BuildSessionPattern(UserId!.Value, SessionId));
     }

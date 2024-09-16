@@ -1,0 +1,145 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.app.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.app.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.app.name }}
+  template:
+    metadata:
+      name: {{ .Values.app.name }}
+      labels:
+        app: {{ .Values.app.name }}
+    spec:
+      containers:
+        - name: {{ .Values.app.name }}
+          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.app.name }}-config
+                  key: env
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.app.name }}-config
+                  key: otelCollector.endpoint
+            - name: OTEL_EXPORTER_SERVICE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.app.name }}-config
+                  key: otelCollector.serviceName
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.name }}-secret
+                  key: connStrings.db
+            - name: ConnectionStrings__RedisConnection
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.name }}-secret
+                  key: connStrings.redis
+            - name: ConnectionStrings__Amqp
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.name }}-secret
+                  key: connStrings.amqp
+            - name: JwtConfiguration__AccessTokenPrivateKey
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.name }}-secret
+                  key: jwtConfig.privateKey
+            - name: JwtConfiguration__AccessTokenPublicKey
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.name }}-secret
+                  key: jwtConfig.publicKey
+            - name: JwtConfiguration__RefreshTokenSecret
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.name }}-secret
+                  key: jwtConfig.refreshTokenSecret
+            - name: JwtConfiguration__AccessTokenMinutesLifetime
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.app.name }}-config
+                  key: jwtConfig.accessTokenLifetimeMinutes
+            - name: JwtConfiguration__RefreshTokenHoursLifetime
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.app.name }}-config
+                  key: jwtConfig.refreshTokenLifetimeHours
+            - name: JwtConfiguration__RefreshTokenInTrustedDevicesHoursLifetime
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.app.name }}-config
+                  key: jwtConfig.refreshTokenLifetimeInTrustedDeviceHours
+            - name: JwtConfiguration__RefreshTokenAllowedRenewsCount
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.app.name }}-config
+                  key: jwtConfig.refreshTokenAllowedRenewsCount
+            - name: JwtConfiguration__Issuer
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.app.name }}-config
+                  key: jwtConfig.issuer
+            - name: SmtpConfiguration__Password
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.name }}-secret
+                  key: smtpConfig.password
+            - name: SmtpConfiguration__UserName
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.name }}-secret
+                  key: smtpConfig.username
+            - name: SmtpConfiguration__Host
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.name }}-secret
+                  key: smtpConfig.host
+            - name: SmtpConfiguration__Port
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.name }}-secret
+                  key: smtpConfig.port
+            - name: SmtpConfiguration__EnableSsl
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.name }}-secret
+                  key: smtpConfig.useSsl
+            - name: SmtpConfiguration__DefaultCredentials
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.name }}-secret
+                  key: smtpConfig.defaultCredentials
+            - name: MailConfiguration__FromEmail
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.app.name }}-config
+                  key: mailConfig.fromEmail
+            - name: MailConfiguration__FromName
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.app.name }}-config
+                  key: mailConfig.fromName
+            {{- range $index, $origin := .Values.config.corsConfig.allowedOrigins }}
+            - name: Cors__AllowedOrigins__{{ $index }}
+              value: {{ $origin }}
+            {{- end }}
+
+      restartPolicy: Always
+      

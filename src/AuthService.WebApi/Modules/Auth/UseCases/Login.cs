@@ -1,4 +1,5 @@
-﻿using AuthService.Common.Results;
+﻿using System.Diagnostics;
+using AuthService.Common.Results;
 using AuthService.WebApi.Common.Auth;
 using FluentValidation;
 

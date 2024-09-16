@@ -1,0 +1,18 @@
+﻿apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.app.name}}-config
+  namespace: {{ .Values.namespace }}
+data:
+  env: {{ .Values.config.env | quote }}
+  jwtConfig.accessTokenLifetimeMinutes: {{ .Values.config.jwtConfig.accessTokenLifetimeMinutes | quote }}
+  jwtConfig.refreshTokenLifetimeHours: {{ .Values.config.jwtConfig.refreshTokenLifetimeHours | quote }}
+  jwtConfig.refreshTokenLifetimeInTrustedDeviceHours: {{ .Values.config.jwtConfig.refreshTokenLifetimeInTrustedDeviceHours | quote}}
+  jwtConfig.refreshTokenAllowedRenewsCount: {{ .Values.config.jwtConfig.refreshTokenAllowedRenewsCount | quote }}
+  jwtConfig.issuer: {{ .Values.config.jwtConfig.issuer | quote }}
+
+  mailConfig.fromEmail: {{ .Values.config.mailConfig.fromEmail | quote}}
+  mailConfig.fromName: {{ .Values.config.mailConfig.fromName | quote}}
+  
+  otelCollector.endpoint: {{ .Values.config.otelCollector.endpoint | quote}}
+  otelCollector.serviceName: {{ .Values.config.otelCollector.serviceName | quote}}

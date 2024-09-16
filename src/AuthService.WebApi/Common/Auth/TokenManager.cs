@@ -1,8 +1,10 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+﻿using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using AuthService.Common;
 using AuthService.Common.Caching;
 using AuthService.Common.Results;
 using AuthService.Common.Timestamp;
@@ -30,8 +32,14 @@ public record RefreshTokenInfo
     public bool TrustedDevice { get; init; }
 }
 
-public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISessionManager sessionManager,
-        IHttpContextAccessor httpContextAccessor, ICacher cacher, RsaKeyHolder rsaKeyHolder, ILogger<TokenManager> logger)
+public class TokenManager(
+    UtcNow utcNow,
+    IOptions<JwtConfig> jwtConfig,
+    ISessionManager sessionManager,
+    IHttpContextAccessor httpContextAccessor,
+    ICacher cacher,
+    RsaKeyHolder rsaKeyHolder,
+    ILogger<TokenManager> logger)
     : ITokenManager
 {
     private readonly JwtConfig _jwtConfig = jwtConfig.Value;
@@ -43,13 +51,17 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static string BuildRevokedAccessTokenKey(long accountId, string accessToken) =>
         $"accounts:{accountId}:revoked-access-tokens:{accessToken}";
-    
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static string BuildGlobalAccessTokenRevocationKey(long accountId) =>
         $"accounts:{accountId}:last-global-access-token-revocation";
 
     private TimeSpan GetRefreshTokenLifetime(bool trustedDevice)
     {
+        logger.LogDebug("RefreshTokenInTrustedDevicesHoursLifetime: {RefreshTokenInTrustedDevicesHoursLifetime}",
+            _jwtConfig.RefreshTokenInTrustedDevicesHoursLifetime);
+        logger.LogDebug("RefreshTokenHoursLifetime: {RefreshTokenHoursLifetime}",
+            _jwtConfig.RefreshTokenHoursLifetime);
         var refreshTokenLifetime = trustedDevice
             ? TimeSpan.FromHours(_jwtConfig.RefreshTokenInTrustedDevicesHoursLifetime)
             : TimeSpan.FromHours(_jwtConfig.RefreshTokenHoursLifetime);
@@ -65,34 +77,44 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
 
     private async Task GenerateAndSetRefreshToken(Session session, TimeSpan expiration)
     {
-        logger.LogInformation("Generating and setting refresh token for {userId} with {expiration}", session.UserId, expiration);
-        
-        var refreshToken = GenerateRefreshToken(session.UserId, session.IdentityId,
-            session.SessionSecret, expiration);
+        await ApiActivitySource.Instance.WithActivity(async activity =>
+        {
+            activity?.AddTag("userId", session.UserId);
+            activity?.AddTag("lifetime", expiration);
+            logger.LogInformation("Generating and setting refresh token for {userId} with {expiration}", session.UserId,
+                expiration);
 
-        await cacher.Set(
-            BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken),
-            new RefreshTokenInfo { TrustedDevice = session.TrustedDevice, UsageCount = 0 },
-            expiration
-        );
+            var refreshToken = GenerateRefreshToken(session.UserId, session.IdentityId,
+                session.SessionSecret, expiration);
+            activity?.AddEvent(new ActivityEvent("RefreshTokenGenerated", utcNow()));
 
-        httpContextAccessor.HttpContext!.Response.Cookies.Append(AuthCookieNames.RefreshTokenCookieName, refreshToken,
-            new CookieOptions
-            {
-                Secure = true,
-                Path = "/",
-                HttpOnly = true,
-                Expires = utcNow().Add(expiration),
-                MaxAge = expiration,
-                SameSite = SameSiteMode.None
-            });
+            await cacher.Set(
+                BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken),
+                new RefreshTokenInfo { TrustedDevice = session.TrustedDevice, UsageCount = 0 },
+                expiration
+            );
+            activity?.AddEvent(new ActivityEvent("RefreshTokenSetOnCache", utcNow()));
+
+            httpContextAccessor.HttpContext!.Response.Cookies.Append(AuthCookieNames.RefreshTokenCookieName,
+                refreshToken,
+                new CookieOptions
+                {
+                    Secure = true,
+                    Path = "/",
+                    HttpOnly = true,
+                    Expires = utcNow().Add(expiration),
+                    MaxAge = expiration,
+                    SameSite = SameSiteMode.None
+                });
+            activity?.AddEvent(new ActivityEvent("RefreshTokenSetOnCookie", utcNow()));
+        });
     }
 
     public async Task<Result<string>> RefreshToken(CancellationToken ct = default)
     {
         var session = (await sessionManager.GetActiveSession())!;
         var refreshToken = httpContextAccessor.HttpContext!.Request.Cookies[AuthCookieNames.RefreshTokenCookieName]!;
-        
+
         logger.LogInformation("Refreshing token for {userId}", session.UserId);
 
         var (info, expiry) =
@@ -102,13 +124,13 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
         if (info!.UsageCount + 1 == _jwtConfig.RefreshTokenAllowedRenewsCount)
         {
             logger.LogInformation("User refreshed with current token too many times");
-            
+
             var newExpiration = info.TrustedDevice
                 ? TimeSpan.FromHours(_jwtConfig.RefreshTokenInTrustedDevicesHoursLifetime)
                 : expiry.GetValueOrDefault();
 
             logger.LogInformation("new refresh token expiration set to {newExpiration}", newExpiration);
-            
+
             await cacher.Remove(BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken));
             await GenerateAndSetRefreshToken(session, newExpiration);
             logger.LogInformation("Generated new refresh token");
@@ -133,12 +155,12 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
 
         if (tokenRevoked)
             return true;
-        
+
         var lastGlobalRevocation = await cacher.Get<DateTime?>(BuildGlobalAccessTokenRevocationKey(userId));
-        
+
         if (lastGlobalRevocation is null)
             return false;
-        
+
         return token.ValidFrom < lastGlobalRevocation;
     }
 
@@ -161,10 +183,18 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
             return;
 
         var session = (await sessionManager.GetActiveSession())!;
-        httpContextAccessor.HttpContext!.Response.Cookies.Delete(AuthCookieNames.RefreshTokenCookieName);
+        httpContextAccessor.HttpContext!.Response.Cookies.Delete(AuthCookieNames.RefreshTokenCookieName,
+            new CookieOptions
+            {
+                Secure = true,
+                Path = "/",
+                HttpOnly = true,
+                Expires = utcNow().AddYears(-1),
+                SameSite = SameSiteMode.None
+            });
         await cacher.Remove(BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken));
     }
-    
+
     private JwtSecurityToken ReadToken(string token)
     {
         return new JwtSecurityTokenHandler().ReadJwtToken(token);
@@ -173,7 +203,7 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
     public async Task RevokeAccessToken()
     {
         logger.LogInformation("Revoking {userId} access token", sessionManager.UserId!.Value);
-        
+
         var token = ReadToken(GetAccessToken());
         await cacher.Set(BuildRevokedAccessTokenKey(sessionManager.UserId!.Value, token.Id), true,
             TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
@@ -189,10 +219,11 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
         return await cacher.Get<RefreshTokenInfo>(
             BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken));
     }
-    
+
     public string GenerateAccessToken(long userId, long identityId)
     {
-        return GenerateAsymmetricToken(userId, identityId, TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
+        return ApiActivitySource.Instance.WithActivity((_) => 
+            GenerateAsymmetricToken(userId, identityId, TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime)));
     }
 
     public string GenerateResetPasswordAccessToken(long userId, long identityId)
@@ -209,7 +240,8 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
 
     private string GenerateRefreshToken(long userId, long identityId, string sessionSecret, TimeSpan lifetime)
     {
-        return GenerateSymmetricToken(userId, identityId, sessionSecret, lifetime);
+        return ApiActivitySource.Instance.WithActivity((_) => 
+            GenerateSymmetricToken(userId, identityId, sessionSecret, lifetime));
     }
 
     private string GenerateSymmetricToken(long userId, long identityId, string secret, TimeSpan lifetime)
@@ -219,7 +251,8 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
         {
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim(CustomJwtClaimsNames.IdentityId, identityId.ToString()),
-            new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64)
+            new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
         var expiry = utcNow().Add(lifetime);
@@ -241,7 +274,7 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
     private string GenerateAsymmetricToken(long userId, long identityId, TimeSpan lifetime)
     {
         var securityKey = rsaKeyHolder.GetPrivateKey();
-        
+
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.RsaSha256Signature)
         {
             CryptoProviderFactory = new CryptoProviderFactory { CacheSignatureProviders = false }
@@ -253,6 +286,7 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim(CustomJwtClaimsNames.IdentityId, identityId.ToString()),
             new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
         var expiry = utcNow().Add(lifetime);

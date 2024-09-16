@@ -1,0 +1,64 @@
+app:
+  name: auth-server
+  image:
+    repository: "registry.homeserver.lucasgoveia.com/lucasgoveia/auth-service"
+    tag: "a9c949b"
+    pullPolicy: "IfNotPresent"
+
+service:
+  type: ClusterIP
+  port: 9999
+
+namespace: auth-service
+
+resources:
+#  limits:
+#    cpu: 100m
+#    memory: 128Mi
+#  requests:
+#    cpu: 100m
+#    memory: 128Mi
+
+config:
+  env: "dev"
+  
+  otelCollector:
+    endpoint: "OTEL_EXPORTER_OTLP_ENDPOINT"
+    serviceName: "auth-server"
+    
+  jwtConfig:
+    accessTokenLifetimeMinutes: 5
+    refreshTokenLifetimeHours: 8
+    refreshTokenLifetimeInTrustedDeviceHours: 48
+    refreshTokenAllowedRenewsCount: 4
+    issuer: auth-server
+  
+  mailConfig:
+    fromEmail: no-reply@localhost
+    fromName: Auth Server
+  
+  corsConfig:
+    allowedOrigins: 
+    - http://localhost:5173
+
+secrets:
+    connStrings:
+        db: "Server=localhost;Database=auth;User Id=sa;Password=Password123;"
+        redis: "localhost:6379"
+        amqp: "amqp://guest:guest@localhost:5672/"
+    jwtConfig:
+        privateKey: "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA"
+        publicKey: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA"
+        refreshTokenSecret: "----- BEGIN REFRESH TOKEN SECRET -----"
+    smtpConfig:
+        password: "password"
+        username: "username"
+        host: "smtp.gmail.com"
+        port: "587"
+        useSsl: "true"
+        defaultCredentials: "false"
+        
+traefik:
+    ingress:
+        host: "auth-server.localhost"
+        path: "/"

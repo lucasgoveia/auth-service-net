@@ -24,6 +24,8 @@ builder.AddBusSetup();
 builder.AddCaching();
 builder.AddAuthSetup();
 builder.AddDatabase();
+builder.Host.AddLoggingSetup();
+builder.Host.AddOpenTelemetrySetup();
 
 builder.Services.AddValidatorsFromAssembly(typeof(RegisterAccountValidator).Assembly);
 
@@ -49,9 +51,7 @@ app.UseCors(c =>
     c.AllowAnyHeader();
     c.AllowAnyMethod();
     c.SetIsOriginAllowedToAllowWildcardSubdomains();
-    c.WithOrigins(
-        builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()!
-    );
+    c.WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? []);
     c.AllowCredentials();
 });
 

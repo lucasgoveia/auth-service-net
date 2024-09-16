@@ -1,4 +1,6 @@
 ﻿using System.Data;
+using System.Diagnostics;
+using AuthService.Common;
 using AuthService.Common.Consts;
 using AuthService.Common.Messaging;
 using AuthService.Common.Results;
@@ -34,39 +36,57 @@ public class AuthenticationService(
     public async Task<string> Authenticate(long userId, long identityId, bool rememberMe,
         CancellationToken ct = default)
     {
-        var device = deviceIdentifier.Identify();
-        await sessionManager.CreateSession(userId, identityId, device, rememberMe);
+        return await ApiActivitySource.Instance.WithActivity(async actity =>
+        {
+            var device = deviceIdentifier.Identify();
+            actity?.AddTag("device.fingerprint", device.Fingerprint);
+            actity?.AddTag("device.ip", device.IpAddress);
 
-        await tokenManager.GenerateAndSetRefreshToken();
+            await sessionManager.CreateSession(userId, identityId, device, rememberMe);
+            actity?.AddEvent(new ActivityEvent("SessionCreated", utcNow()));
 
-        var accessToken = tokenManager.GenerateAccessToken(userId, identityId);
+            await tokenManager.GenerateAndSetRefreshToken();
+            actity?.AddEvent(new ActivityEvent("RefreshTokenGenerated", utcNow()));
 
-        return accessToken;
+            var accessToken = tokenManager.GenerateAccessToken(userId, identityId);
+            actity?.AddEvent(new ActivityEvent("AccessTokenGenerated", utcNow()));
+
+            return accessToken;
+        });
     }
 
     public async Task<Result<string>> LogIn(string username, string password, bool rememberMe,
         CancellationToken ct = default)
     {
-        logger.LogInformation("user {username} is logging in", username);
-        var identity = await identityForLoginGetter.Get(username, utcNow(), ct);
-
-        if (identity is null)
-            return ErrorResult.Unauthorized();
-
-        var correctCredentials = passwordHasher.Verify(password, identity.PasswordHash);
-
-        if (!correctCredentials)
+        return await ApiActivitySource.Instance.WithActivity<Result<string>>(async (activity) =>
         {
-            logger.LogInformation("{username} login attempt failed", username);
-            await messageBus.Publish(new LoginAttemptFailed { UserId = identity.UserId }, ct);
-            return ErrorResult.Unauthorized();
-        }
+            activity?.AddTag("username", username);
+            logger.LogInformation("user {username} is logging in with rememberMe: {rememberMe}", username, rememberMe);
+            var identity = await identityForLoginGetter.Get(username, utcNow(), ct);
 
-        var accessToken = await Authenticate(identity.UserId, identity.Id, rememberMe, ct);
-        logger.LogInformation("{username} login attempt succeed", username);
+            if (identity is null)
+                return ErrorResult.Unauthorized();
 
-        await messageBus.Publish(new LoginAttemptSucceed { UserId = identity.UserId }, ct);
-        return SuccessResult.Success(accessToken);
+
+            var correctCredentials = ApiActivitySource.Instance.WithActivity(
+                (_) => passwordHasher.Verify(password, identity.PasswordHash),
+                "PasswordVerification");
+
+            if (!correctCredentials)
+            {
+                activity?.AddEvent(new ActivityEvent("LoginAttemptFailed", utcNow()));
+                logger.LogInformation("{username} login attempt failed", username);
+                await messageBus.Publish(new LoginAttemptFailed { UserId = identity.UserId }, ct);
+                return ErrorResult.Unauthorized();
+            }
+
+            activity?.AddEvent(new ActivityEvent("LoginAttemptSuccess", utcNow()));
+            var accessToken = await Authenticate(identity.UserId, identity.Id, rememberMe, ct);
+            logger.LogInformation("{username} login attempt succeed", username);
+
+            await messageBus.Publish(new LoginAttemptSucceed { UserId = identity.UserId }, ct);
+            return SuccessResult.Success(accessToken);
+        });
     }
 
 
