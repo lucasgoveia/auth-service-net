@@ -219,7 +219,14 @@ public class SessionManager : ISessionManager
         if (SessionId is null)
             return;
 
-        _httpContextAccessor.HttpContext?.Response.Cookies.Delete(AuthCookieNames.SessionId);
+        _httpContextAccessor.HttpContext?.Response.Cookies.Delete(AuthCookieNames.SessionId, new CookieOptions
+        {
+            Secure = true,
+            Path = "/",
+            HttpOnly = true,
+            Expires = _utcNow().AddYears(-1),
+            SameSite = SameSiteMode.None
+        });
         await _sessionRepository.Delete(SessionId, _utcNow());
         await _cacher.ClearPattern(BuildSessionPattern(UserId!.Value, SessionId));
     }

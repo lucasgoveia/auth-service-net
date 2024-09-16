@@ -161,7 +161,14 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
             return;
 
         var session = (await sessionManager.GetActiveSession())!;
-        httpContextAccessor.HttpContext!.Response.Cookies.Delete(AuthCookieNames.RefreshTokenCookieName);
+        httpContextAccessor.HttpContext!.Response.Cookies.Delete(AuthCookieNames.RefreshTokenCookieName, new CookieOptions
+        {
+            Secure = true,
+            Path = "/",
+            HttpOnly = true,
+            Expires = utcNow().AddYears(-1),
+            SameSite = SameSiteMode.None
+        });
         await cacher.Remove(BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken));
     }
     
@@ -219,7 +226,8 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
         {
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim(CustomJwtClaimsNames.IdentityId, identityId.ToString()),
-            new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64)
+            new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
         var expiry = utcNow().Add(lifetime);
@@ -253,6 +261,7 @@ public class TokenManager(UtcNow utcNow, IOptions<JwtConfig> jwtConfig, ISession
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim(CustomJwtClaimsNames.IdentityId, identityId.ToString()),
             new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
         var expiry = utcNow().Add(lifetime);
