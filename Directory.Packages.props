@@ -34,7 +34,7 @@
     <PackageVersion Include="Npgsql" Version="8.0.3" />
     <PackageVersion Include="NSubstitute" Version="5.1.0" />
     <PackageVersion Include="Respawn" Version="6.2.1" />
-    <PackageVersion Include="StackExchange.Redis" Version="2.8.14" />
+    <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.7.3" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.0.2" />
     <PackageVersion Include="Testcontainers" Version="3.10.0" />
