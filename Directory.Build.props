@@ -1,0 +1,10 @@
+<Project>
+    <PropertyGroup>
+        <Authors>Lucas Goveia</Authors>
+        <NoWarn>$(NoWarn);CS1591;xUnit1013</NoWarn>
+    </PropertyGroup>
+    <PropertyGroup>
+        <LangVersion>latest</LangVersion>
+        <TargetFramework>net9.0</TargetFramework>
+    </PropertyGroup>
+</Project>
