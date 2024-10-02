@@ -1,10 +1,11 @@
 ﻿using System.Data;
 using AuthService.Common.Consts;
-using AuthService.Common.Results;
 using AuthService.Common.Security;
 using AuthService.WebApi.Common.Auth;
 using Dapper;
 using FluentValidation;
+using LucasGoveia.Results;
+using LucasGoveia.SnowflakeId;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
 
@@ -36,7 +37,9 @@ public record ChangePasswordResponse
     public required string AccessToken { get; init; }
 }
 
-public class ChangePasswordHandler(IIdentityPasswordChanger identityPasswordChanger, ISessionManager sessionManager,
+public class ChangePasswordHandler(
+    IIdentityPasswordChanger identityPasswordChanger,
+    ISessionManager sessionManager,
     IAuthenticationService authenticationService)
 {
     public async Task<Result<ChangePasswordResponse>> Handle(ChangePassword req, CancellationToken ct)
@@ -44,7 +47,7 @@ public class ChangePasswordHandler(IIdentityPasswordChanger identityPasswordChan
         var changePasswordResult = await identityPasswordChanger.ChangePassword(sessionManager.IdentityId!.Value,
             req.CurrentPassword, req.NewPassword, ct);
 
-        if (!changePasswordResult.Success)
+        if (!changePasswordResult.IsSuccess)
             return changePasswordResult.AsError()!;
 
         if (req.LogOutAllSessions)
@@ -55,7 +58,7 @@ public class ChangePasswordHandler(IIdentityPasswordChanger identityPasswordChan
         var accessToken = await authenticationService.Authenticate(sessionManager.UserId!.Value,
             sessionManager.IdentityId!.Value, true, ct);
 
-        return SuccessResult.Success(new ChangePasswordResponse
+        return Result.Ok(new ChangePasswordResponse
         {
             AccessToken = accessToken
         });
@@ -64,8 +67,8 @@ public class ChangePasswordHandler(IIdentityPasswordChanger identityPasswordChan
 
 public interface IIdentityPasswordChanger
 {
-    Task<Result> ChangePassword(long identityId, string oldPassword, string newPassword, CancellationToken ct);
-    Task ResetPassword(long identityId, string newPassword, CancellationToken ct);
+    Task<Result> ChangePassword(SnowflakeId identityId, string oldPassword, string newPassword, CancellationToken ct);
+    Task ResetPassword(SnowflakeId identityId, string newPassword, CancellationToken ct);
 }
 
 public class IdentityPasswordChanger : IIdentityPasswordChanger
@@ -79,35 +82,35 @@ public class IdentityPasswordChanger : IIdentityPasswordChanger
         _passwordHasher = passwordHasher;
     }
 
-    public async Task<Result> ChangePassword(long identityId, string oldPassword, string newPassword,
+    public async Task<Result> ChangePassword(SnowflakeId identityId, string oldPassword, string newPassword,
         CancellationToken ct)
     {
         var oldPasswordVerified = await VerifyOldPassword(identityId, oldPassword, ct);
 
         if (!oldPasswordVerified)
         {
-            return ErrorResult.Unauthorized();
+            return Result.Unauthorized();
         }
 
         var newPassHash = _passwordHasher.Hash(newPassword);
         await PersistNewPassword(identityId, newPassHash, ct);
-        return SuccessResult.Success();
+        return Result.Ok();
     }
 
-    public async Task ResetPassword(long identityId, string newPassword, CancellationToken ct)
+    public async Task ResetPassword(SnowflakeId identityId, string newPassword, CancellationToken ct)
     {
         var newPassHash = _passwordHasher.Hash(newPassword);
         await PersistNewPassword(identityId, newPassHash, ct);
     }
 
-    private async Task PersistNewPassword(long identityId, string newPassword, CancellationToken ct)
+    private async Task PersistNewPassword(SnowflakeId identityId, string newPassword, CancellationToken ct)
     {
         await _dbConnection.ExecuteAsync(
             $"UPDATE {TableNames.Identities} SET password_hash = @newPassword WHERE Id = @identityId",
             new { identityId, newPassword });
     }
 
-    private async Task<bool> VerifyOldPassword(long identityId, string oldPassword, CancellationToken ct)
+    private async Task<bool> VerifyOldPassword(SnowflakeId identityId, string oldPassword, CancellationToken ct)
     {
         var identityOldPassHash = await _dbConnection.QuerySingleAsync<string>(
             $"SELECT password_hash FROM {TableNames.Identities} WHERE Id = @identityId", new { identityId });

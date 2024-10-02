@@ -1,7 +1,7 @@
-﻿using AuthService.Common.Results;
-using AuthService.Common.Security;
+﻿using AuthService.Common.Security;
 using AuthService.WebApi.Common.Auth;
 using FluentValidation;
+using LucasGoveia.Results;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
 
@@ -20,8 +20,11 @@ public class ResetPasswordValidator : AbstractValidator<ResetPassword>
     }
 }
 
-public class ResetPasswordHandler(IIdentityPasswordChanger identityPasswordChanger, ISessionManager sessionManager,
-    IAuthenticationService authenticationService, ITokenManager tokenManager)
+public class ResetPasswordHandler(
+    IIdentityPasswordChanger identityPasswordChanger,
+    ISessionManager sessionManager,
+    IAuthenticationService authenticationService,
+    ITokenManager tokenManager)
 {
     public async Task<Result> Handle(ResetPassword req, CancellationToken ct)
     {
@@ -29,7 +32,7 @@ public class ResetPasswordHandler(IIdentityPasswordChanger identityPasswordChang
 
         await tokenManager.RevokeAccessToken();
         await authenticationService.LogOutAllSessions(ct);
-        
-        return SuccessResult.Success();
+
+        return Result.Ok();
     }
 }

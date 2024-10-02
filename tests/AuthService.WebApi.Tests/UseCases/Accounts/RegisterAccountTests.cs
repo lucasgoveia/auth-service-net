@@ -33,7 +33,7 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
         var response = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
     [Fact]

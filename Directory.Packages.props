@@ -14,8 +14,11 @@
     <PackageVersion Include="FluentValidation" Version="11.10.0" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.10.0" />
     <PackageVersion Include="Fluid.Core" Version="2.11.1" />
-    <PackageVersion Include="IdGen" Version="3.0.7" />
-    <PackageVersion Include="IdGen.DependencyInjection" Version="3.0.7" />
+    <PackageVersion Include="LucasGoveia.Results" Version="0.1.1" />
+    <PackageVersion Include="LucasGoveia.Results.AspNetCore" Version="0.1.0" />
+    <PackageVersion Include="LucasGoveia.Results.FluentValidation" Version="0.1.0" />
+    <PackageVersion Include="LucasGoveia.SnowflakeId" Version="0.1.0" />
+    <PackageVersion Include="LucasGoveia.Unit" Version="0.1.1" />
     <PackageVersion Include="MailKit" Version="4.7.1.1" />
     <PackageVersion Include="MassTransit.Abstractions" Version="8.2.5" />
     <PackageVersion Include="MassTransit.RabbitMQ" Version="8.2.5" />

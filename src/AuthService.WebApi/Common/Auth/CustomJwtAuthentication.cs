@@ -1,10 +1,12 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+﻿using System.Globalization;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
 using System.Text.Encodings.Web;
 using AuthService.Common.Timestamp;
+using LucasGoveia.SnowflakeId;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Logging;
@@ -62,7 +64,7 @@ public class CustomJwtAuthenticationHandler(IOptionsMonitor<CustomJwtAuthenticat
 
             var jwtToken = (validatedToken as JwtSecurityToken)!;
 
-            if (!await tokenManager.IsAccessTokenRevoked(long.Parse(jwtToken.Subject), token))
+            if (!await tokenManager.IsAccessTokenRevoked(SnowflakeId.Parse(jwtToken.Subject, CultureInfo.InvariantCulture), token))
             {
                 return (jwtToken, true);
             }

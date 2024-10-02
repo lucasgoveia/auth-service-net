@@ -1,9 +1,9 @@
 ﻿using AuthService.Common.Security;
 using AuthService.WebApi.Common;
 using AuthService.WebApi.Common.Auth;
-using AuthService.WebApi.Common.ResultExtensions;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using AuthService.WebApi.Modules.Accounts.UseCases;
+using LucasGoveia.Results.AspNetCore;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuthService.WebApi.Modules.Accounts;

@@ -1,12 +1,13 @@
 ﻿using System.Data;
 using AuthService.Common.Consts;
-using AuthService.Common.Results;
 using AuthService.Common.Security;
 using AuthService.Common.Timestamp;
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using Dapper;
 using FluentValidation;
+using LucasGoveia.Results;
+using LucasGoveia.SnowflakeId;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
 
@@ -25,7 +26,9 @@ public class VerifyEmailValidator : AbstractValidator<VerifyEmail>
     }
 }
 
-public class VerifyEmailHandler(IEmailVerificationManager emailVerificationManager, UtcNow utcNow,
+public class VerifyEmailHandler(
+    IEmailVerificationManager emailVerificationManager,
+    UtcNow utcNow,
     ISessionManager sessionManager,
     IAccountEmailVerifiedSetter accountEmailVerifiedSetter)
 {
@@ -37,24 +40,24 @@ public class VerifyEmailHandler(IEmailVerificationManager emailVerificationManag
 
         if (!validCode)
         {
-            return ErrorResult.Invalid();
+            return Result.Invalid();
         }
 
         await emailVerificationManager.RevokeCode(userId);
         await accountEmailVerifiedSetter.Set(userId, utcNow(), ct);
 
-        return SuccessResult.Success();
+        return Result.Ok();
     }
 }
 
 public interface IAccountEmailVerifiedSetter
 {
-    Task Set(long userId, DateTime utcNow, CancellationToken ct = default);
+    Task Set(SnowflakeId userId, DateTime utcNow, CancellationToken ct = default);
 }
 
 public class AccountEmailVerifiedSetter(IDbConnection dbConnection) : IAccountEmailVerifiedSetter
 {
-    public async Task Set(long userId, DateTime utcNow, CancellationToken ct = default)
+    public async Task Set(SnowflakeId userId, DateTime utcNow, CancellationToken ct = default)
     {
         await dbConnection.ExecuteAsync(
             $"UPDATE {TableNames.Users} SET email_verified = true, updated_at = @utcNow WHERE id = @userId",

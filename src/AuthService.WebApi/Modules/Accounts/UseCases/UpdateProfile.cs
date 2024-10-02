@@ -1,10 +1,11 @@
 ﻿using System.Data;
 using AuthService.Common.Consts;
-using AuthService.Common.Results;
 using AuthService.Common.Timestamp;
 using AuthService.WebApi.Common.Auth;
 using Dapper;
 using FluentValidation;
+using LucasGoveia.Results;
+using LucasGoveia.SnowflakeId;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
 
@@ -28,18 +29,18 @@ public class UpdateProfileHandler(ISessionManager sessionManager, UtcNow utcNow,
         var userId = sessionManager.UserId!.Value;
         await profileUpdater.UpdateProfile(userId, request.Name, utcNow(), ct);
 
-        return SuccessResult.Success();
+        return Result.Ok();
     }
 }
 
 public interface IProfileUpdater
 {
-    Task UpdateProfile(long userId, string name, DateTime utcNow, CancellationToken ct);
+    Task UpdateProfile(SnowflakeId userId, string name, DateTime utcNow, CancellationToken ct);
 }
 
 public class ProfileUpdater(IDbConnection dbConnection) : IProfileUpdater
 {
-    public async Task UpdateProfile(long userId, string name, DateTime utcNow, CancellationToken ct)
+    public async Task UpdateProfile(SnowflakeId userId, string name, DateTime utcNow, CancellationToken ct)
     {
         await dbConnection.ExecuteAsync(
             $"UPDATE {TableNames.Users} SET name = @name, updated_at = @utcNow WHERE id = @userId",

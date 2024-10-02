@@ -35,7 +35,7 @@ public class InitiatePasswordRecoveryTests : TestBase, IClassFixture<Integration
             Email = "test@example.com"
         });
         
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class InitiatePasswordRecoveryTests : TestBase, IClassFixture<Integration
             Email = "someemail@example.com"
         });
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
     }
 
     [Fact]

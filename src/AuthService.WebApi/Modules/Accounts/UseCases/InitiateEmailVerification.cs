@@ -1,9 +1,10 @@
 ﻿using System.Data;
 using AuthService.Common.Consts;
-using AuthService.Common.Results;
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using Dapper;
+using LucasGoveia.Results;
+using LucasGoveia.SnowflakeId;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
 
@@ -12,7 +13,8 @@ public record InitiateEmailVerification
     public static readonly InitiateEmailVerification Instance = new();
 }
 
-public class InitiateEmailVerificationHandler(IEmailVerificationManager emailVerificationManager,
+public class InitiateEmailVerificationHandler(
+    IEmailVerificationManager emailVerificationManager,
     ISessionManager sessionManager,
     IUserEmailGetter userEmailGetter)
 {
@@ -23,18 +25,18 @@ public class InitiateEmailVerificationHandler(IEmailVerificationManager emailVer
         var email = await userEmailGetter.Get(userId, ct);
         await emailVerificationManager.SendCode(userId, email);
 
-        return SuccessResult.Success();
+        return Result.Accepted();
     }
 }
 
 public interface IUserEmailGetter
 {
-    Task<string> Get(long userId, CancellationToken ct = default);
+    Task<string> Get(SnowflakeId userId, CancellationToken ct = default);
 }
 
 public class UserEmailGetter(IDbConnection dbConnection) : IUserEmailGetter
 {
-    public async Task<string> Get(long userId, CancellationToken ct = default)
+    public async Task<string> Get(SnowflakeId userId, CancellationToken ct = default)
     {
         return await dbConnection.QuerySingleAsync<string>(
             $"SELECT email FROM {TableNames.Users} WHERE Id = @userId", new { userId });

@@ -1,11 +1,12 @@
 ﻿using System.Data;
 using AuthService.Common.Consts;
-using AuthService.Common.Results;
 using AuthService.Common.Security;
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using Dapper;
 using FluentValidation;
+using LucasGoveia.Results;
+using LucasGoveia.SnowflakeId;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
 
@@ -34,24 +35,26 @@ public class VerifyPasswordRecoveryCodeValidator : AbstractValidator<VerifyPassw
     }
 }
 
-public class VerifyPasswordRecoveryCodeHandler(IPasswordRecoveryManager passwordRecoveryManager,
-    ITokenManager tokenManager, IDbConnection dbConnection)
+public class VerifyPasswordRecoveryCodeHandler(
+    IPasswordRecoveryManager passwordRecoveryManager,
+    ITokenManager tokenManager,
+    IDbConnection dbConnection)
 {
     public async Task<Result<VerifyPasswordRecoveryCodeResponse>> Handle(VerifyPasswordRecoveryCode req,
         CancellationToken ct = default)
     {
         var validCode = await passwordRecoveryManager.Verify(req.Email, req.Code);
 
-        var userInfo = await dbConnection.QuerySingleOrDefaultAsync<(long id, long userId)?>(
+        var userInfo = await dbConnection.QuerySingleOrDefaultAsync<(SnowflakeId id, SnowflakeId userId)?>(
             $"SELECT id, user_id FROM {TableNames.Identities} WHERE username = @Email", req);
 
         if (!validCode || userInfo is null)
         {
-            return ErrorResult.Invalid();
+            return Result.Invalid();
         }
 
         var token = tokenManager.GenerateResetPasswordAccessToken(userInfo.Value.userId, userInfo.Value.id);
         await passwordRecoveryManager.RevokeCode(req.Email);
-        return SuccessResult.Success(new VerifyPasswordRecoveryCodeResponse { ResetToken = token });
+        return Result.Ok(new VerifyPasswordRecoveryCodeResponse { ResetToken = token });
     }
 }

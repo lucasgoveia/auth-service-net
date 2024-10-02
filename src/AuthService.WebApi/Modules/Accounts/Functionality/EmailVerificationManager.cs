@@ -3,21 +3,22 @@ using AuthService.Common.Caching;
 using AuthService.Common.Messaging;
 using AuthService.Common.Security;
 using AuthService.WebApi.Messages.Commands;
+using LucasGoveia.SnowflakeId;
 
 namespace AuthService.WebApi.Modules.Accounts.Functionality;
 
 public interface IEmailVerificationManager
 {
-    Task SendCode(long userId, string email);
-    Task<bool> Verify(long userId, string code);
-    Task RevokeCode(long userId);
+    Task SendCode(SnowflakeId userId, string email);
+    Task<bool> Verify(SnowflakeId userId, string code);
+    Task RevokeCode(SnowflakeId userId);
 }
 
 public class EmailVerificationManager(IEmailVerificationCodeRepository codeRepository,
         IPasswordHasher hasher, IMessageBus bus, IOtpGenerator otpGenerator)
     : IEmailVerificationManager
 {
-    public async Task SendCode(long userId, string email)
+    public async Task SendCode(SnowflakeId userId, string email)
     {
         var code = otpGenerator.Generate();
         var hashedCode = hasher.Hash(code);
@@ -26,7 +27,7 @@ public class EmailVerificationManager(IEmailVerificationCodeRepository codeRepos
     }
 
 
-    public async Task<bool> Verify(long userId, string code)
+    public async Task<bool> Verify(SnowflakeId userId, string code)
     {
         var savedHashedCode = await codeRepository.Get(userId);
 
@@ -38,7 +39,7 @@ public class EmailVerificationManager(IEmailVerificationCodeRepository codeRepos
         return hasher.Verify(code, savedHashedCode);
     }
 
-    public Task RevokeCode(long userId)
+    public Task RevokeCode(SnowflakeId userId)
     {
         return codeRepository.Remove(userId);
     }
@@ -46,9 +47,9 @@ public class EmailVerificationManager(IEmailVerificationCodeRepository codeRepos
 
 public interface IEmailVerificationCodeRepository
 {
-    Task Save(long accountId, string hashedCode);
-    Task<string?> Get(long accountId);
-    Task Remove(long accountId);
+    Task Save(SnowflakeId accountId, string hashedCode);
+    Task<string?> Get(SnowflakeId accountId);
+    Task Remove(SnowflakeId accountId);
 }
 
 public class EmailVerificationCodeRepository : IEmailVerificationCodeRepository
@@ -61,20 +62,20 @@ public class EmailVerificationCodeRepository : IEmailVerificationCodeRepository
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static string BuildKey(long accountId) => $"accounts:email-verification:{accountId}";
+    private static string BuildKey(SnowflakeId accountId) => $"accounts:email-verification:{accountId}";
 
-    public async Task Save(long accountId, string hashedCode)
+    public async Task Save(SnowflakeId accountId, string hashedCode)
     {
         var key = BuildKey(accountId);
         await _cacher.Set(key, hashedCode, TimeSpan.FromMinutes(30));
     }
 
-    public async Task<string?> Get(long accountId)
+    public async Task<string?> Get(SnowflakeId accountId)
     {
         return await _cacher.Get<string>(BuildKey(accountId));
     }
 
-    public Task Remove(long accountId)
+    public Task Remove(SnowflakeId accountId)
     {
         return _cacher.Remove(BuildKey(accountId));
     }

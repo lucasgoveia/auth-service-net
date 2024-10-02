@@ -1,19 +1,20 @@
 ﻿using System.Data;
 using AuthService.Common.Consts;
-using AuthService.Common.Results;
 using AuthService.WebApi.Common.Auth;
 using Dapper;
+using LucasGoveia.Results;
+using LucasGoveia.SnowflakeId;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
 
 public record GetProfile
 {
-    public static GetProfile Instance = new();
+    public static readonly GetProfile Instance = new();
 }
 
 public record Profile
 {
-    public required long UserId { get; init; }
+    public required SnowflakeId UserId { get; init; }
     public required string Name { get; init; }
     public string? AvatarLink { get; init; }
 }
@@ -28,6 +29,6 @@ public class GetProfileHandler(IDbConnection dbConnection, ISessionManager sessi
             $"SELECT id AS UserId, name, avatar_link FROM {TableNames.Users} WHERE id = @UserId",
             new { UserId = userId });
 
-        return SuccessResult.Success(profile);
+        return Result.Ok(profile);
     }
 }
