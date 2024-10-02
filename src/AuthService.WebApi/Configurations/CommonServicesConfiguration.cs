@@ -1,10 +1,7 @@
-﻿using AuthService.Common;
-using AuthService.Common.Security;
+﻿using AuthService.Common.Security;
 using AuthService.Common.Timestamp;
 using AuthService.WebApi.Common;
 using AuthService.WebApi.Common.Auth;
-using IdGen;
-using IdGen.DependencyInjection;
 
 namespace AuthService.WebApi.Configurations;
 
