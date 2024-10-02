@@ -3,12 +3,13 @@ using System.Diagnostics;
 using AuthService.Common;
 using AuthService.Common.Consts;
 using AuthService.Common.Messaging;
-using AuthService.Common.Results;
 using AuthService.Common.Security;
 using AuthService.Common.Timestamp;
 using AuthService.WebApi.Common.Devices;
 using AuthService.WebApi.Messages.Events;
 using Dapper;
+using LucasGoveia.Results;
+using LucasGoveia.SnowflakeId;
 
 namespace AuthService.WebApi.Common.Auth;
 
@@ -18,7 +19,7 @@ public interface IAuthenticationService
     Task LogOut(CancellationToken ct = default);
     Task LogOutAllSessions(CancellationToken ct);
 
-    Task<string> Authenticate(long userId, long identityId, bool rememberMe,
+    Task<string> Authenticate(SnowflakeId userId, SnowflakeId identityId, bool rememberMe,
         CancellationToken ct = default);
 }
 
@@ -33,7 +34,7 @@ public class AuthenticationService(
     ILogger<AuthenticationService> logger)
     : IAuthenticationService
 {
-    public async Task<string> Authenticate(long userId, long identityId, bool rememberMe,
+    public async Task<string> Authenticate(SnowflakeId userId, SnowflakeId identityId, bool rememberMe,
         CancellationToken ct = default)
     {
         return await ApiActivitySource.Instance.WithActivity(async actity =>
@@ -65,7 +66,7 @@ public class AuthenticationService(
             var identity = await identityForLoginGetter.Get(username, utcNow(), ct);
 
             if (identity is null)
-                return ErrorResult.Unauthorized();
+                return Result.Unauthorized();
 
 
             var correctCredentials = ApiActivitySource.Instance.WithActivity(
@@ -77,7 +78,7 @@ public class AuthenticationService(
                 activity?.AddEvent(new ActivityEvent("LoginAttemptFailed", utcNow()));
                 logger.LogInformation("{username} login attempt failed", username);
                 await messageBus.Publish(new LoginAttemptFailed { UserId = identity.UserId }, ct);
-                return ErrorResult.Unauthorized();
+                return Result.Unauthorized();
             }
 
             activity?.AddEvent(new ActivityEvent("LoginAttemptSuccess", utcNow()));
@@ -85,7 +86,7 @@ public class AuthenticationService(
             logger.LogInformation("{username} login attempt succeed", username);
 
             await messageBus.Publish(new LoginAttemptSucceed { UserId = identity.UserId }, ct);
-            return SuccessResult.Success(accessToken);
+            return Result.Ok(accessToken);
         });
     }
 
@@ -108,8 +109,8 @@ public class AuthenticationService(
 
 public record IdentityForLogin
 {
-    public required long Id { get; init; }
-    public required long UserId { get; init; }
+    public required SnowflakeId Id { get; init; }
+    public required SnowflakeId UserId { get; init; }
     public required string PasswordHash { get; init; }
 }
 

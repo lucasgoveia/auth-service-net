@@ -1,6 +1,8 @@
-﻿namespace AuthService.WebApi.Messages.Events;
+﻿using LucasGoveia.SnowflakeId;
+
+namespace AuthService.WebApi.Messages.Events;
 
 public record LoginAttemptFailed
 {
-    public required long UserId { get; init; }
+    public required SnowflakeId UserId { get; init; }
 }

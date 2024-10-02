@@ -1,8 +1,10 @@
-﻿namespace AuthService.WebApi.Modules.Accounts;
+﻿using LucasGoveia.SnowflakeId;
+
+namespace AuthService.WebApi.Modules.Accounts;
 
 public record User
 {
-    public long Id { get; init; }
+    public SnowflakeId Id { get; init; }
     public string Name { get; init; } = null!;
     public string? AvatarLink { get; init; }
     public string? Email { get; init; }
@@ -17,7 +19,7 @@ public record User
     public int AccessFailedCount { get; init; }
     public bool TwoFactorEnabled { get; init; }
     
-    public static User CreateNewUser(long id, string email, string? name, DateTime now)
+    public static User CreateNewUser(SnowflakeId id, string email, string? name, DateTime now)
     {
         return new User
         {

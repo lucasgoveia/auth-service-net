@@ -1,10 +1,9 @@
 ﻿using System.Data;
 using AuthService.Common.Consts;
-using AuthService.Common.Results;
-using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using Dapper;
 using FluentValidation;
+using LucasGoveia.Results;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
 
@@ -21,7 +20,8 @@ public class InitiatePasswordRecoveryValidator : AbstractValidator<InitiatePassw
     }
 }
 
-public class InitiatePasswordRecoveryHandler(IPasswordRecoveryManager passwordRecoveryManager,
+public class InitiatePasswordRecoveryHandler(
+    IPasswordRecoveryManager passwordRecoveryManager,
     IDbConnection dbConnection)
 {
     public async Task<Result> Handle(InitiatePasswordRecovery request, CancellationToken ct)
@@ -30,10 +30,10 @@ public class InitiatePasswordRecoveryHandler(IPasswordRecoveryManager passwordRe
             $"SELECT 1 FROM {TableNames.Identities} WHERE username = @Email", request);
 
         if (!identityExists)
-            return SuccessResult.Success();
+            return Result.Accepted();
 
         await passwordRecoveryManager.SendCode(request.Email);
 
-        return SuccessResult.Success();
+        return Result.Accepted();
     }
 }

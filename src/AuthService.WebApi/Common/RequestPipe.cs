@@ -1,6 +1,6 @@
-﻿using AuthService.Common.Results;
-using AuthService.WebApi.Common.ResultExtensions;
-using FluentValidation;
+﻿using FluentValidation;
+using LucasGoveia.Results;
+using LucasGoveia.Results.FluentValidation;
 
 namespace AuthService.WebApi.Common;
 

@@ -2,12 +2,12 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 using AuthService.Common;
 using AuthService.Common.Caching;
-using AuthService.Common.Results;
 using AuthService.Common.Timestamp;
+using LucasGoveia.Results;
+using LucasGoveia.SnowflakeId;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -15,15 +15,15 @@ namespace AuthService.WebApi.Common.Auth;
 
 public interface ITokenManager
 {
-    string GenerateAccessToken(long userId, long identityId);
+    string GenerateAccessToken(SnowflakeId userId, SnowflakeId identityId);
     Task<Result<string>> RefreshToken(CancellationToken ct = default);
-    Task<bool> IsAccessTokenRevoked(long userId, string accessToken, CancellationToken ct = default);
+    Task<bool> IsAccessTokenRevoked(SnowflakeId userId, string accessToken, CancellationToken ct = default);
     Task GenerateAndSetRefreshToken();
     Task RemoveRefreshToken();
     Task RevokeAccessToken();
     Task<RefreshTokenInfo?> GetRefreshTokenInfo();
-    string GenerateResetPasswordAccessToken(long userId, long identityId);
-    Task RevokeUserAccessTokens(long userId);
+    string GenerateResetPasswordAccessToken(SnowflakeId userId, SnowflakeId identityId);
+    Task RevokeUserAccessTokens(SnowflakeId userId);
 }
 
 public record RefreshTokenInfo
@@ -45,15 +45,15 @@ public class TokenManager(
     private readonly JwtConfig _jwtConfig = jwtConfig.Value;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static string BuildRefreshTokenKey(long accountId, string sessionId, string refreshToken) =>
+    private static string BuildRefreshTokenKey(SnowflakeId accountId, string sessionId, string refreshToken) =>
         $"accounts:{accountId}:sessions:{sessionId}:refresh-token:{refreshToken}";
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static string BuildRevokedAccessTokenKey(long accountId, string accessToken) =>
+    private static string BuildRevokedAccessTokenKey(SnowflakeId accountId, string accessToken) =>
         $"accounts:{accountId}:revoked-access-tokens:{accessToken}";
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static string BuildGlobalAccessTokenRevocationKey(long accountId) =>
+    private static string BuildGlobalAccessTokenRevocationKey(SnowflakeId accountId) =>
         $"accounts:{accountId}:last-global-access-token-revocation";
 
     private TimeSpan GetRefreshTokenLifetime(bool trustedDevice)
@@ -137,7 +137,7 @@ public class TokenManager(
 
             var accessToken = GenerateAccessToken(session.UserId, session.IdentityId);
             logger.LogInformation("Generated new access token");
-            return SuccessResult.Success(accessToken);
+            return Result.Ok(accessToken);
         }
 
         await cacher.Set(BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken),
@@ -145,10 +145,10 @@ public class TokenManager(
             expiry);
         logger.LogInformation("Generated new access token");
 
-        return SuccessResult.Success(GenerateAccessToken(session.UserId, session.IdentityId));
+        return Result.Ok(GenerateAccessToken(session.UserId, session.IdentityId));
     }
 
-    public async Task<bool> IsAccessTokenRevoked(long userId, string accessToken, CancellationToken ct = default)
+    public async Task<bool> IsAccessTokenRevoked(SnowflakeId userId, string accessToken, CancellationToken ct = default)
     {
         var token = ReadToken(accessToken);
         var tokenRevoked = await cacher.Get<bool?>(BuildRevokedAccessTokenKey(userId, token.Id)) ?? false;
@@ -220,31 +220,32 @@ public class TokenManager(
             BuildRefreshTokenKey(session.UserId, session.SessionId, refreshToken));
     }
 
-    public string GenerateAccessToken(long userId, long identityId)
+    public string GenerateAccessToken(SnowflakeId userId, SnowflakeId identityId)
     {
-        return ApiActivitySource.Instance.WithActivity((_) => 
+        return ApiActivitySource.Instance.WithActivity((_) =>
             GenerateAsymmetricToken(userId, identityId, TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime)));
     }
 
-    public string GenerateResetPasswordAccessToken(long userId, long identityId)
+    public string GenerateResetPasswordAccessToken(SnowflakeId userId, SnowflakeId identityId)
     {
         return GenerateSymmetricToken(userId, identityId, _jwtConfig.ResetPasswordTokenSecret,
             TimeSpan.FromMinutes(_jwtConfig.ResetPasswordTokenMinutesLifetime));
     }
 
-    public Task RevokeUserAccessTokens(long userId)
+    public Task RevokeUserAccessTokens(SnowflakeId userId)
     {
         return cacher.Set(BuildGlobalAccessTokenRevocationKey(userId), utcNow(),
             TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
     }
 
-    private string GenerateRefreshToken(long userId, long identityId, string sessionSecret, TimeSpan lifetime)
+    private string GenerateRefreshToken(SnowflakeId userId, SnowflakeId identityId, string sessionSecret,
+        TimeSpan lifetime)
     {
-        return ApiActivitySource.Instance.WithActivity((_) => 
+        return ApiActivitySource.Instance.WithActivity((_) =>
             GenerateSymmetricToken(userId, identityId, sessionSecret, lifetime));
     }
 
-    private string GenerateSymmetricToken(long userId, long identityId, string secret, TimeSpan lifetime)
+    private string GenerateSymmetricToken(SnowflakeId userId, SnowflakeId identityId, string secret, TimeSpan lifetime)
     {
         var now = utcNow();
         var claims = new[]
@@ -271,7 +272,7 @@ public class TokenManager(
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    private string GenerateAsymmetricToken(long userId, long identityId, TimeSpan lifetime)
+    private string GenerateAsymmetricToken(SnowflakeId userId, SnowflakeId identityId, TimeSpan lifetime)
     {
         var securityKey = rsaKeyHolder.GetPrivateKey();
 

@@ -1,10 +1,10 @@
 ﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using AuthService.Common.Results;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Modules.Auth.UseCases;
 using FluentAssertions;
+using LucasGoveia.Results;
 
 namespace AuthService.WebApi.Tests.UseCases.Accounts;
 

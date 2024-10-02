@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using AuthService.Common;
@@ -9,6 +10,7 @@ using AuthService.Common.Security;
 using AuthService.Common.Timestamp;
 using AuthService.WebApi.Common.Devices;
 using Dapper;
+using LucasGoveia.SnowflakeId;
 using Microsoft.Extensions.Options;
 
 namespace AuthService.WebApi.Common.Auth;
@@ -17,8 +19,8 @@ public record Session
 {
     public int Id { get; init; }
     public required string SessionId { get; init; } = null!;
-    public required long UserId { get; init; }
-    public required long IdentityId { get; init; }
+    public required SnowflakeId UserId { get; init; }
+    public required SnowflakeId IdentityId { get; init; }
     public required string IpAddress { get; init; } = null!;
     public required string UserAgent { get; init; } = null!;
     public required bool TrustedDevice { get; init; }
@@ -30,11 +32,11 @@ public record Session
 
 public interface ISessionManager
 {
-    long? IdentityId { get; }
-    long? UserId { get; }
+    SnowflakeId? IdentityId { get; }
+    SnowflakeId? UserId { get; }
     string? SessionId { get; }
 
-    Task<Session> CreateSession(long userId, long identityId, DeviceDto device, bool trustedDevice = false);
+    Task<Session> CreateSession(SnowflakeId userId, SnowflakeId identityId, DeviceDto device, bool trustedDevice = false);
     Task<Session?> GetActiveSession();
     Task TerminateSession();
     Task TerminateAllSessions();
@@ -66,41 +68,41 @@ public class SessionManager : ISessionManager
     private readonly ICacher _cacher;
     private readonly ILogger<SessionManager> _logger;
 
-    private long? _userId;
-    private long? _identityId;
+    private SnowflakeId? _userId;
+    private SnowflakeId? _identityId;
     private string? _sessionId;
 
-    public long? IdentityId
+    public SnowflakeId? IdentityId
     {
         get => _identityId ?? GetIdentityId();
         set => _identityId = value;
     }
 
-    public long? UserId
+    public SnowflakeId? UserId
     {
         get => _userId ?? GetUserId();
         set => _userId = value;
     }
 
-    private long? GetUserId()
+    private SnowflakeId? GetUserId()
     {
         var userId = _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (userId is null)
             return null;
 
-        _userId = long.Parse(userId);
+        _userId = SnowflakeId.Parse(userId, CultureInfo.InvariantCulture);
         return _userId;
     }
 
-    private long? GetIdentityId()
+    private SnowflakeId? GetIdentityId()
     {
         var identityId = _httpContextAccessor.HttpContext?.User.FindFirstValue(CustomJwtClaimsNames.IdentityId);
 
         if (identityId is null)
             return null;
 
-        _identityId = long.Parse(identityId);
+        _identityId = SnowflakeId.Parse(identityId, CultureInfo.InvariantCulture);
         return _identityId;
     }
 
@@ -128,7 +130,7 @@ public class SessionManager : ISessionManager
     }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static string BuildSessionPropKey(long userId, string sessionId, string propName) =>
+    private static string BuildSessionPropKey(SnowflakeId userId, string sessionId, string propName) =>
         $"accounts:{userId}:sessions:{sessionId}:{propName}";
     
     public async Task AddSessionProperty<T>(string name, T value)
@@ -147,13 +149,13 @@ public class SessionManager : ISessionManager
         return await _cacher.Get<T>(BuildSessionPropKey(UserId.Value, SessionId, name));
     }
 
-    public async Task<Session> CreateSession(long userId, long identityId, DeviceDto device, bool trustedDevice = false)
+    public async Task<Session> CreateSession(SnowflakeId userId, SnowflakeId identityId, DeviceDto device, bool trustedDevice = false)
     {
         _logger.LogInformation("creating session for user {userId} with IP {device.IpAddress}", userId, device.IpAddress);
         return await CreateSession(userId, identityId, device, trustedDevice, lifetime: null);
     }
     
-    private async Task<Session> CreateSession(long userId, long identityId, DeviceDto device, bool trustedDevice, TimeSpan? lifetime)
+    private async Task<Session> CreateSession(SnowflakeId userId, SnowflakeId identityId, DeviceDto device, bool trustedDevice, TimeSpan? lifetime)
     {
         return await ApiActivitySource.Instance.WithActivity(async activity =>
         {
@@ -212,11 +214,11 @@ public class SessionManager : ISessionManager
     }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static string BuildUserSessionsPattern(long accountId) =>
+    private static string BuildUserSessionsPattern(SnowflakeId accountId) =>
         $"accounts:{accountId}:sessions:*";
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static string BuildSessionPattern(long accountId, string sessionId) =>
+    private static string BuildSessionPattern(SnowflakeId accountId, string sessionId) =>
         $"accounts:{accountId}:sessions:{sessionId}:*";
 
     public async Task TerminateSession()
@@ -260,7 +262,7 @@ public interface ISessionRepository
     Task Add(Session session);
     Task<Session?> Get(string sessionId);
     Task Delete(string sessionId, DateTime now);
-    Task DeleteUserSessions(long userId, DateTime now);
+    Task DeleteUserSessions(SnowflakeId userId, DateTime now);
 }
 
 public class SessionRepository(IDbConnection dbConnection, IAesEncryptor aesEncryptor, IOptions<JwtConfig> jwtConfig)
@@ -306,7 +308,7 @@ public class SessionRepository(IDbConnection dbConnection, IAesEncryptor aesEncr
             new { sessionId, now });
     }
 
-    public async Task DeleteUserSessions(long userId, DateTime now)
+    public async Task DeleteUserSessions(SnowflakeId userId, DateTime now)
     {
         await dbConnection.ExecuteAsync(
             @$"UPDATE {TableNames.UserSessions} SET ended_at = @now WHERE user_id = @userId AND ended_at IS NULL",

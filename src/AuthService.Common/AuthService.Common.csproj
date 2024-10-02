@@ -7,9 +7,16 @@
 
     <ItemGroup>
       <PackageReference Include="BCrypt.Net-Next" />
+      <PackageReference Include="LucasGoveia.Results" />
+      <PackageReference Include="LucasGoveia.SnowflakeId" />
+      <PackageReference Include="LucasGoveia.Unit" />
       <PackageReference Include="MassTransit.Abstractions" />
       <PackageReference Include="OpenTelemetry.Api" />
       <PackageReference Include="StackExchange.Redis" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Results\" />
     </ItemGroup>
 
 </Project>

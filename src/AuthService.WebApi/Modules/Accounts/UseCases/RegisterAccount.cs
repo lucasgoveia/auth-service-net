@@ -1,13 +1,13 @@
 ﻿using System.Data;
-using AuthService.Common;
 using AuthService.Common.Consts;
-using AuthService.Common.Results;
 using AuthService.Common.Security;
 using AuthService.Common.Timestamp;
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Modules.Accounts.Functionality;
 using Dapper;
 using FluentValidation;
+using LucasGoveia.Results;
+using LucasGoveia.SnowflakeId;
 
 namespace AuthService.WebApi.Modules.Accounts.UseCases;
 
@@ -42,15 +42,18 @@ public class RegisterAccountValidator : AbstractValidator<RegisterAccount>
     }
 }
 
-public sealed class RegisterAccountHandler(INewAccountSaver saver, UtcNow utcNow, IPasswordHasher passwordHasher,
-    IEmailVerificationManager emailVerificationManager, GenerateId generateId,
+public sealed class RegisterAccountHandler(
+    INewAccountSaver saver,
+    UtcNow utcNow,
+    IPasswordHasher passwordHasher,
+    IEmailVerificationManager emailVerificationManager,
     IAuthenticationService authenticationService)
 {
     public async Task<Result<RegisterAccountResponse>> Handle(RegisterAccount req, CancellationToken ct = default)
     {
         var hashedPassword = passwordHasher.Hash(req.Password);
-        var identityId = await generateId();
-        var userId = await generateId();
+        var identityId = SnowflakeId.NewId();
+        var userId = SnowflakeId.NewId();
 
         var account = Identity.CreateNewIdentity(userId, identityId, req.Email, hashedPassword, utcNow());
         var user = User.CreateNewUser(userId, req.Email, req.Name, utcNow());
@@ -61,7 +64,7 @@ public sealed class RegisterAccountHandler(INewAccountSaver saver, UtcNow utcNow
 
         var token = await authenticationService.Authenticate(userId, identityId, true, ct);
 
-        return SuccessResult.Success(new RegisterAccountResponse { AccessToken = token });
+        return Result.Created(new RegisterAccountResponse { AccessToken = token });
     }
 }
 
