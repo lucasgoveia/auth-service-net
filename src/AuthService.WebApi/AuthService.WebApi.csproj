@@ -19,8 +19,6 @@
         <PackageReference Include="Dapper"/>
         <PackageReference Include="FluentValidation"/>
         <PackageReference Include="FluentValidation.DependencyInjectionExtensions"/>
-        <PackageReference Include="IdGen"/>
-        <PackageReference Include="IdGen.DependencyInjection"/>
         <PackageReference Include="LucasGoveia.Results.AspNetCore" />
         <PackageReference Include="LucasGoveia.Results.FluentValidation" />
         <PackageReference Include="MassTransit.RabbitMQ"/>
