@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Modules.Auth.UseCases;
+using AuthService.WebApi.Modules.Auth.UseCases.Login;
 using AuthService.WebApi.Tests.Utils;
 using FluentAssertions;
 using Microsoft.Net.Http.Headers;
@@ -35,10 +36,10 @@ public class ChangePasswordTests : TestBase, IClassFixture<IntegrationTestFactor
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
         res.EnsureSuccessStatusCode();
 
-        res = await Client.PostAsJsonAsync("/login", new Login
+        res = await Client.PostAsJsonAsync("/login", new LoginWithEmailNPasswordData
         {
             Password = TestPassword,
-            Username = TestEmail,
+            Email = TestEmail,
             RememberMe = true,
         });
 
@@ -157,9 +158,9 @@ public class ChangePasswordTests : TestBase, IClassFixture<IntegrationTestFactor
         res = await Client.PostAsync("/logout", null!);
         res.EnsureSuccessStatusCode();
 
-        res = await Client.PostAsJsonAsync("/login", new Login
+        res = await Client.PostAsJsonAsync("/login", new LoginWithEmailNPasswordData
         {
-            Username = TestEmail,
+            Email = TestEmail,
             Password = TestPassword,
             RememberMe = false,
         });
@@ -183,9 +184,9 @@ public class ChangePasswordTests : TestBase, IClassFixture<IntegrationTestFactor
         await Client.PostAsJsonAsync("/accounts/change-password", changePasswordRequest);
         await Client.PostAsync("/logout", null!);
 
-        var res = await Client.PostAsJsonAsync("/login", new Login
+        var res = await Client.PostAsJsonAsync("/login", new LoginWithEmailNPasswordData
         {
-            Username = TestEmail,
+            Email = TestEmail,
             Password = "Test1234!_345ax2",
             RememberMe = false,
         });
@@ -249,9 +250,9 @@ public class ChangePasswordTests : TestBase, IClassFixture<IntegrationTestFactor
             var fingerprint = Guid.NewGuid().ToString();
             Client.DefaultRequestHeaders.Add("Fingerprint", fingerprint);
 
-            var res = Client.PostAsJsonAsync("/login", new Login
+            var res = Client.PostAsJsonAsync("/login", new LoginWithEmailNPasswordData
             {
-                Username = TestEmail,
+                Email = TestEmail,
                 Password = TestPassword,
                 RememberMe = true,
             }).GetAwaiter().GetResult();

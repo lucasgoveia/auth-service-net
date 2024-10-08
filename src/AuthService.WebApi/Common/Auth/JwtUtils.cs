@@ -54,7 +54,7 @@ public static class JwtUtils
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, userId, ClaimValueTypes.Integer64),
-            new(CustomJwtClaimsNames.IdentityId, identityId, ClaimValueTypes.Integer64),
+            new(CustomJwtClaimsNames.CredentialId, identityId, ClaimValueTypes.Integer64),
         };
 
         var identity = new ClaimsIdentity(claims, scheme);

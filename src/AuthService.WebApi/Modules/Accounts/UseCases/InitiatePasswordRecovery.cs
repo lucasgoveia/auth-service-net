@@ -27,7 +27,7 @@ public class InitiatePasswordRecoveryHandler(
     public async Task<Result> Handle(InitiatePasswordRecovery request, CancellationToken ct)
     {
         var identityExists = await dbConnection.QuerySingleOrDefaultAsync<bool>(
-            $"SELECT 1 FROM {TableNames.Identities} WHERE username = @Email", request);
+            $"SELECT 1 FROM {TableNames.Credentials} WHERE identifier = @Email AND type = '{CredentialType.Email.ToDbValue()}'::iam.credential_type", request);
 
         if (!identityExists)
             return Result.Accepted();

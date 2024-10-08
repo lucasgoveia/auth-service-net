@@ -10,24 +10,6 @@ table "users" {
     null = false
     type = varchar(256)
   }
-  column "email" {
-    null = true
-    type = varchar(256)
-  }
-  column "email_verified" {
-    null    = false
-    type    = boolean
-    default = false
-  }
-  column "phone_number" {
-    null = true
-    type = varchar(20)
-  }
-  column "phone_number_verified" {
-    null    = false
-    type    = boolean
-    default = false
-  }
   column "avatar_link" {
     null = true
     type = varchar(1000)
@@ -67,20 +49,63 @@ table "users" {
     columns = [column.id]
   }
   
-  index "users_email_idx" {
-    columns = [column.email]
-  }
-  
-  index "users_email_email_verified_idx" {
-    columns = [column.email, column.email_verified]
-  }
-  
   index "users_id_access_failed_count_idx" {
     columns = [column.id, column.access_failed_count]
   }
 }
 
-table "identities" {
+table "user_emails" {
+  schema = schema.iam
+  column "user_id" {
+    null = false
+    type = bigint
+  }
+  column "email" {
+    null = false
+    type = varchar(256)
+  }
+  column "verified" {
+    null = false
+    type = boolean
+    default = false
+  }
+  column "created_at" {
+    null = false
+    type = timestamp
+  }
+  column "updated_at" {
+    null = false
+    type = timestamp
+  }
+  column "deleted_at" {
+    null = true
+    type = timestamp
+  }
+  primary_key {
+    columns = [column.user_id, column.email]
+  }
+  
+  foreign_key "user_emails_users_fk" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+  }
+  
+  index "user_emails_user_id_idx" {
+    columns = [column.user_id]
+  }
+  
+  unique "unique_user_email" {
+    columns = [column.email]
+  }
+}
+
+
+enum "credential_type" {
+  schema = schema.iam
+  values = ["email", "username", "phone", "social", "b2b", "passkey"]
+}
+
+table "credentials" {
   schema = schema.iam
   column "id" {
     null = false
@@ -90,13 +115,27 @@ table "identities" {
     null = false
     type = bigint
   }
-  column "username" {
+  column "type" {
     null = false
-    type = varchar(100)
+    type = enum.credential_type // e.g., email, phone, social, sso, passkey
+    default = "email"
   }
-  column "password_hash" {
+  column "identifier" {
+    null = true
+    type = varchar(256) // For email, phone number, provider ID, etc.
+  }
+  column "secret" {
+    null = true
+    type = varchar(512) // Could be password hash, public key for passkeys, or null for SSO/social
+  }
+  column "provider" {
+    null = true
+    type = varchar(100) // Used for social and SSO (e.g., google, facebook, azure_ad), nullable for email/phone
+  }
+  column "verified" {
     null = false
-    type = varchar(256)
+    type = boolean
+    default = false
   }
   column "created_at" {
     null = false
@@ -117,11 +156,17 @@ table "identities" {
     columns     = [column.user_id]
     ref_columns = [table.users.column.id]
   }
-  index "identities_username_idx" {
-    columns = [column.username]
+  
+  index "user_identities_credential_type_idx" {
+    columns = [column.type]
   }
-  index "identities_username_deleted_at_idx" {
-    columns = [column.username, column.deleted_at]
+  
+  index "credentials_user_credential_type_idx" {
+    columns = [column.user_id, column.type]
+  }
+  
+  unique "unique_credential_per_type" {
+    columns = [column.type, column.identifier]
   }
 }
 
@@ -140,11 +185,15 @@ table "user_sessions" {
     null = false
     type = varchar(32)
   }
+  column "orchestration_id" {
+    null = false
+    type = varchar(32)
+  }
   column "user_id" {
     null = false
     type = bigint
   }
-  column "identity_id" {
+  column "credential_id" {
     null = false
     type = bigint
   }
@@ -154,7 +203,7 @@ table "user_sessions" {
   }
   column "user_agent" {
     null = false
-    type = varchar(200)
+    type = varchar(256)
   }
   column "device_fingerprint" {
     null = false
@@ -164,7 +213,7 @@ table "user_sessions" {
     null = false
     type = timestamp
   }
-  column "ended_at" {
+  column "expires_at" {
     null = true
     type = timestamp
   }
@@ -172,11 +221,35 @@ table "user_sessions" {
     null = false
     type = varchar(256)
   }
-
-  index "user_sessions_session_id_ended_at_idx" {
-    columns = [column.session_id, column.ended_at]
+  primary_key {
+    columns = [column.id]
   }
-  index "user_sessions_user_id_session_id_ended_at_idx" {
-    columns = [column.user_id, column.session_id, column.ended_at]
+
+  foreign_key "user_sessions_users_fk" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+  }
+  
+  foreign_key "user_sessions_credentials_fk" {
+    columns     = [column.credential_id]
+    ref_columns = [table.credentials.column.id]
+  }
+  
+  unique "user_sessions_session_id_unique" {
+    columns = [column.session_id]
+  }
+  
+  unique "user_sessions_orchestration_id_unique" {
+    columns = [column.orchestration_id]
+  }
+  
+  index "column.user_id" {
+    columns = [ column.user_id ]
+  }
+  index "user_sessions_session_id_expires_at_idx" {
+    columns = [column.session_id, column.expires_at]
+  }
+  index "user_sessions_user_id_session_id_expires_at_idx" {
+    columns = [column.user_id, column.session_id, column.expires_at]
   }
 }

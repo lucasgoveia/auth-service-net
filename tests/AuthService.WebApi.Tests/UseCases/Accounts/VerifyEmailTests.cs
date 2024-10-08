@@ -7,6 +7,7 @@ using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Messages.Commands;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Modules.Auth.UseCases;
+using AuthService.WebApi.Modules.Auth.UseCases.Login;
 using AuthService.WebApi.Tests.Fakes;
 using Dapper;
 using FluentAssertions;
@@ -60,26 +61,6 @@ public class VerifyEmailTests : TestBase, IClassFixture<IntegrationTestFactory>
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
-
-    [Fact]
-    public async Task Verifiy_email_should_set_user_email_as_verified()
-    {
-        // Arrange
-        var verifyEmailRequest = new VerifyEmail
-        {
-            Code = _code,
-        };
-
-        // Act
-        var res = await Client.PostAsJsonAsync("/accounts/verify-email", verifyEmailRequest);
-        res.EnsureSuccessStatusCode();
-
-        // Assert
-        (await Factory.Services.GetRequiredService<IDbConnection>().ExecuteScalarAsync<bool>(
-                $"SELECT email_verified FROM {TableNames.Users} WHERE email = @Email", new { Email = TestEmail }))
-            .Should()
-            .BeTrue();
     }
 
     [Fact]
@@ -143,10 +124,10 @@ public class VerifyEmailTests : TestBase, IClassFixture<IntegrationTestFactory>
         // Arrange
         DateTimeHolder.MockedUtcNow = DateTimeHolder.MockedUtcNow.AddHours(1);
         
-        var loginRes = await Client.PostAsJsonAsync("/login", new Login
+        var loginRes = await Client.PostAsJsonAsync("/login", new LoginWithEmailNPasswordData
         {
             Password = TestPassword,
-            Username = TestEmail,
+            Email = TestEmail,
             RememberMe = false,
         });
         

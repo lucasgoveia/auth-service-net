@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using AuthService.WebApi.Messages.Commands;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Modules.Auth.UseCases;
+using AuthService.WebApi.Modules.Auth.UseCases.Login;
 using FluentAssertions;
 using Microsoft.Net.Http.Headers;
 
@@ -117,9 +118,9 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
         await Client.PostAsJsonAsync("/accounts/reset-password", resetRequest);
 
         // Assert
-        var loginRes = await Client.PostAsJsonAsync("/login", new Login
+        var loginRes = await Client.PostAsJsonAsync("/login", new LoginWithEmailNPasswordData
         {
-            Username = TestEmail,
+            Email = TestEmail,
             Password = resetRequest.NewPassword,
             RememberMe = false
         });
@@ -137,9 +138,9 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
         await Client.PostAsJsonAsync("/accounts/reset-password", resetRequest);
 
         // Assert
-        var loginRes = await Client.PostAsJsonAsync("/login", new Login
+        var loginRes = await Client.PostAsJsonAsync("/login", new LoginWithEmailNPasswordData
         {
-            Username = TestEmail,
+            Email = TestEmail,
             Password = TestPassword,
             RememberMe = false
         });
@@ -156,9 +157,9 @@ public class ResetPasswordTests : TestBase, IClassFixture<IntegrationTestFactory
             var fingerprint = Guid.NewGuid().ToString();
             Client.DefaultRequestHeaders.Add("Fingerprint", fingerprint);
 
-            var res = Client.PostAsJsonAsync("/login", new Login
+            var res = Client.PostAsJsonAsync("/login", new LoginWithEmailNPasswordData
             {
-                Username = TestEmail,
+                Email = TestEmail,
                 Password = TestPassword,
                 RememberMe = true,
             }).GetAwaiter().GetResult();

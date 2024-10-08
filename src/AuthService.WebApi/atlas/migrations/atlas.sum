@@ -1,7 +1,8 @@
-h1:o+FI4+2zqPiFWxa7fokAaKnIqKEOSURkuz+JILr7+vM=
+h1:BigeUF5TFGe7ai+q4q57V3pvnZqShu/ERVrfhadzd54=
 20230922203654_initial.sql h1:iWVhU8/ul34ClVhpJsqhM6bHLRxH8I6pDzJSO3hlzQs=
 20230926153320_schema_normalization.sql h1:KQVyHxz/Cg1YBjKhC17UZ5Kg72/jxbOVuUE902c98KI=
 20230926211908_user_lockout_indexes.sql h1:vTVcmOrREAc31v11ZTkHBIk9R8HU7a9u8aQMAZ0VdEg=
 20230926212334_session_secret_renaming.sql h1:a+NP2uTK0fu2dqF+8eIxD4TwNaZ+c3K4ApAkQmASCBo=
 20231004182107_fix_user_agent_size.sql h1:6DDnZEJyP72oR+0oscVKfHx31zt1h0LlVggp7drbhfE=
 20240909184449_fix_sessions_ip_address.sql h1:0J9Te2HnyBmdwR6flzOgT+eV4XQ/dFniaT7hdgTT4Lc=
+20241005125326_multiple_identites_types.sql h1:cv5zhjSTUTbkZuwpnuqczcH0sn6wsHxK7rVJApKUlTc=

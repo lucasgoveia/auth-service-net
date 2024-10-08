@@ -9,8 +9,6 @@ using AuthService.Mailing;
 using AuthService.WebApi.Common.Devices;
 using AuthService.WebApi.Tests.Fakes;
 using Dapper;
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
 using MassTransit;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

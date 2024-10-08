@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using AuthService.WebApi.Messages.Commands;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Modules.Auth.UseCases;
+using AuthService.WebApi.Modules.Auth.UseCases.Login;
 using AuthService.WebApi.Tests.Fakes;
 using FluentAssertions;
 
@@ -30,10 +31,10 @@ public class InitiateEmailVerificationTests : TestBase, IClassFixture<Integratio
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
         res.EnsureSuccessStatusCode();
         
-        res = await Client.PostAsJsonAsync("/login", new Login
+        res = await Client.PostAsJsonAsync("/login", new LoginWithEmailNPasswordData
         {
             Password = registerAccountRequest.Password,
-            Username = registerAccountRequest.Email,
+            Email = registerAccountRequest.Email,
             RememberMe = true,
         });
         

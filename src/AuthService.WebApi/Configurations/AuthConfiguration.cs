@@ -1,6 +1,7 @@
 ﻿using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Common.Auth.Requirements;
 using AuthService.WebApi.Common.Devices;
+using AuthService.WebApi.Modules.Auth.UseCases.Login;
 using Microsoft.AspNetCore.Authorization;
 
 namespace AuthService.WebApi.Configurations;
@@ -12,7 +13,7 @@ public static class AuthConfiguration
         builder.Services.Configure<JwtConfig>(builder.Configuration.GetSection("JwtConfiguration"));
         builder.Services.AddSingleton<RsaKeyHolder>();
         builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
-        builder.Services.AddScoped<IIdentityForLoginGetter, IdentityForLoginGetter>();
+        builder.Services.AddScoped<ICredentialForLoginGetter, CredentialForLoginGetter>();
         builder.Services.AddScoped<IDeviceIdentifier, DeviceIdentifier>();
 
         builder.Services.AddScoped<ISessionManager, SessionManager>();

@@ -60,7 +60,7 @@ public class AccountEmailVerifiedSetter(IDbConnection dbConnection) : IAccountEm
     public async Task Set(SnowflakeId userId, DateTime utcNow, CancellationToken ct = default)
     {
         await dbConnection.ExecuteAsync(
-            $"UPDATE {TableNames.Users} SET email_verified = true, updated_at = @utcNow WHERE id = @userId",
+            $"UPDATE {TableNames.UserEmails} SET verified = true, updated_at = @utcNow WHERE user_id = @userId",
             new { userId, utcNow });
     }
 }

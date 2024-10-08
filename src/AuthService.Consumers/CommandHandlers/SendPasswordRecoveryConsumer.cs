@@ -15,7 +15,9 @@ public class SendPasswordRecoveryConsumer(IEmailSender emailSender, IDbConnectio
         var template = TemplateEmailFinder.GetTemplate(Templates.PasswordRecovery);
 
         var username = await dbConnection.QuerySingleOrDefaultAsync<string>(
-            $"SELECT name FROM {TableNames.Users} WHERE email = @Email",
+            $@"SELECT u.name FROM {TableNames.Users} u 
+                    JOIN {TableNames.UserEmails} e ON u.id = e.user_id
+                    WHERE e.email = @Email",
             new { context.Message.Email });
 
         if (string.IsNullOrEmpty(username)) return;

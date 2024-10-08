@@ -46,7 +46,7 @@ public class CustomJwtAuthenticationHandler(IOptionsMonitor<CustomJwtAuthenticat
             return AuthenticateResult.Fail("Unauthorized");
 
         var ticket = JwtUtils.CreateAuthenticationTicket(validatedToken.Subject,
-            validatedToken.Claims.First(x => x.Type == CustomJwtClaimsNames.IdentityId).Value, Scheme.Name);
+            validatedToken.Claims.First(x => x.Type == CustomJwtClaimsNames.CredentialId).Value, Scheme.Name);
         return AuthenticateResult.Success(ticket);
     }
 

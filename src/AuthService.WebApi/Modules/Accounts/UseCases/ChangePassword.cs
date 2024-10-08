@@ -106,14 +106,14 @@ public class IdentityPasswordChanger : IIdentityPasswordChanger
     private async Task PersistNewPassword(SnowflakeId identityId, string newPassword, CancellationToken ct)
     {
         await _dbConnection.ExecuteAsync(
-            $"UPDATE {TableNames.Identities} SET password_hash = @newPassword WHERE Id = @identityId",
+            $"UPDATE {TableNames.Credentials} SET secret = @newPassword WHERE Id = @identityId",
             new { identityId, newPassword });
     }
 
     private async Task<bool> VerifyOldPassword(SnowflakeId identityId, string oldPassword, CancellationToken ct)
     {
         var identityOldPassHash = await _dbConnection.QuerySingleAsync<string>(
-            $"SELECT password_hash FROM {TableNames.Identities} WHERE Id = @identityId", new { identityId });
+            $"SELECT secret FROM {TableNames.Credentials} WHERE Id = @identityId", new { identityId });
         return _passwordHasher.Verify(oldPassword, identityOldPassHash);
     }
 }

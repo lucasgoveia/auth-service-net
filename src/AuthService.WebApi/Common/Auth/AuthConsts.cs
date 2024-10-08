@@ -2,8 +2,8 @@
 
 public static class CustomJwtClaimsNames
 {
-    public const string IdentityId = "identityId";
-    public const string Scope = "scope";
+    public const string CredentialId = "credentialId";
+    public const string SessionOrchestrationId = "orchestrationId";
 }
 
 public static class AuthCookieNames

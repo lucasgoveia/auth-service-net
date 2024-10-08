@@ -19,15 +19,16 @@ public record Session
 {
     public int Id { get; init; }
     public required string SessionId { get; init; } = null!;
+    public required string OrchestrationId { get; init; } = null!;
     public required SnowflakeId UserId { get; init; }
-    public required SnowflakeId IdentityId { get; init; }
+    public required SnowflakeId CredentialId { get; init; }
     public required string IpAddress { get; init; } = null!;
     public required string UserAgent { get; init; } = null!;
     public required bool TrustedDevice { get; init; }
     public required string DeviceFingerprint { get; init; } = null!;
     public required DateTime CreatedAt { get; init; }
     public required string SessionSecret { get; init; }
-    public DateTime? EndedAt { get; init; }
+    public DateTime? ExpiresAt { get; init; }
 }
 
 public interface ISessionManager
@@ -36,17 +37,12 @@ public interface ISessionManager
     SnowflakeId? UserId { get; }
     string? SessionId { get; }
 
-    Task<Session> CreateSession(SnowflakeId userId, SnowflakeId identityId, DeviceDto device, bool trustedDevice = false);
+    Task<Session> CreateSession(SnowflakeId userId, SnowflakeId identityId, DeviceDto device, bool trustedDevice, TimeSpan lifetime);
     Task<Session?> GetActiveSession();
     Task TerminateSession();
     Task TerminateAllSessions();
-    Task AddSessionProperty<T>(string name, T value);
-    Task<T?> GetSessionProperty<T>(string name);
-}
-
-public static class SessionPropertiesNames
-{
-    public const string VerifiedRecoveryCode = "verified_recovery_code";
+    Task SetActiveSessionByOrchestrationId(string orchestrationId);
+    Task SetActiveSessionById(string sessionId);
 }
 
 public class SessionManager : ISessionManager
@@ -97,7 +93,7 @@ public class SessionManager : ISessionManager
 
     private SnowflakeId? GetIdentityId()
     {
-        var identityId = _httpContextAccessor.HttpContext?.User.FindFirstValue(CustomJwtClaimsNames.IdentityId);
+        var identityId = _httpContextAccessor.HttpContext?.User.FindFirstValue(CustomJwtClaimsNames.CredentialId);
 
         if (identityId is null)
             return null;
@@ -129,52 +125,29 @@ public class SessionManager : ISessionManager
         }
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static string BuildSessionPropKey(SnowflakeId userId, string sessionId, string propName) =>
-        $"accounts:{userId}:sessions:{sessionId}:{propName}";
-    
-    public async Task AddSessionProperty<T>(string name, T value)
-    {
-        if (SessionId is null || !UserId.HasValue)
-            throw new InvalidOperationException();
-
-        await _cacher.Set(BuildSessionPropKey(UserId.Value, SessionId, name), value, TimeSpan.FromDays(30));
-    }
-    
-    public async Task<T?> GetSessionProperty<T>(string name)
-    {
-        if (SessionId is null || !UserId.HasValue)
-            throw new InvalidOperationException();
-
-        return await _cacher.Get<T>(BuildSessionPropKey(UserId.Value, SessionId, name));
-    }
-
-    public async Task<Session> CreateSession(SnowflakeId userId, SnowflakeId identityId, DeviceDto device, bool trustedDevice = false)
+    public async Task<Session> CreateSession(SnowflakeId userId, SnowflakeId identityId, DeviceDto device, bool trustedDevice, TimeSpan lifetime)
     {
         _logger.LogInformation("creating session for user {userId} with IP {device.IpAddress}", userId, device.IpAddress);
-        return await CreateSession(userId, identityId, device, trustedDevice, lifetime: null);
-    }
-    
-    private async Task<Session> CreateSession(SnowflakeId userId, SnowflakeId identityId, DeviceDto device, bool trustedDevice, TimeSpan? lifetime)
-    {
         return await ApiActivitySource.Instance.WithActivity(async activity =>
         {
             var sessionId = _keyGenerator.Generate(SessionIdAlphabet, SessionIdLength);
+            var orchestrationId = _keyGenerator.Generate(SessionIdAlphabet, SessionIdLength);
 
             var now = _utcNow();
 
             _session = new Session
             {
                 SessionId = sessionId,
+                OrchestrationId = orchestrationId,
                 UserId = userId,
-                IdentityId = identityId,
+                CredentialId = identityId,
                 IpAddress = device.IpAddress,
                 UserAgent = device.UserAgent,
                 TrustedDevice = trustedDevice,
                 DeviceFingerprint = device.Fingerprint,
                 CreatedAt = now,
                 SessionSecret = GenerateJwtKey(),
-                EndedAt = lifetime.HasValue ? now.Add(lifetime.Value) : now.AddYears(10)
+                ExpiresAt = now.Add(lifetime)
             };
 
             _httpContextAccessor.HttpContext?.Response.Cookies.Append(AuthCookieNames.SessionId, sessionId,
@@ -183,9 +156,9 @@ public class SessionManager : ISessionManager
                     Secure = true,
                     Path = "/",
                     HttpOnly = true,
-                    Expires = _session.EndedAt,
+                    Expires = _session.ExpiresAt,
                     MaxAge = lifetime,
-                    SameSite = SameSiteMode.None
+                    SameSite = SameSiteMode.Strict
                 });
             activity?.AddEvent(new ActivityEvent("AddedSessionCookie", now));
 
@@ -199,7 +172,7 @@ public class SessionManager : ISessionManager
             return _session;
         });
     }
-
+    
     public async Task<Session?> GetActiveSession()
     {
         if (_session is not null)
@@ -234,7 +207,7 @@ public class SessionManager : ISessionManager
             Path = "/",
             HttpOnly = true,
             Expires = _utcNow().AddYears(-1),
-            SameSite = SameSiteMode.None
+            SameSite = SameSiteMode.Strict
         });
         await _sessionRepository.Delete(SessionId, _utcNow());
         await _cacher.ClearPattern(BuildSessionPattern(UserId!.Value, SessionId));
@@ -250,6 +223,17 @@ public class SessionManager : ISessionManager
         await _sessionRepository.DeleteUserSessions(UserId.Value, _utcNow());
         await _cacher.ClearPattern(BuildUserSessionsPattern(UserId.Value));
     }
+    
+    public async Task SetActiveSessionByOrchestrationId(string orchestrationId)
+    {
+        _session = await _sessionRepository.GetByOrchestration(orchestrationId);
+    }
+
+    public async Task SetActiveSessionById(string sessionId)
+    {
+        SessionId = sessionId;
+        _session = await _sessionRepository.Get(sessionId);
+    }
 
     private string GenerateJwtKey()
     {
@@ -263,6 +247,7 @@ public interface ISessionRepository
     Task<Session?> Get(string sessionId);
     Task Delete(string sessionId, DateTime now);
     Task DeleteUserSessions(SnowflakeId userId, DateTime now);
+    Task<Session?> GetByOrchestration(string orchestrationId);
 }
 
 public class SessionRepository(IDbConnection dbConnection, IAesEncryptor aesEncryptor, IOptions<JwtConfig> jwtConfig)
@@ -280,15 +265,15 @@ public class SessionRepository(IDbConnection dbConnection, IAesEncryptor aesEncr
 
         await dbConnection.ExecuteAsync(
             @$"INSERT INTO {TableNames.UserSessions} 
-                (session_id, user_id, identity_id, ip_address, user_agent, device_fingerprint, created_at, session_secret) 
-                VALUES (@SessionId, @UserId, @IdentityId, @IpAddress, @UserAgent, @DeviceFingerprint, @CreatedAt, @SessionSecret)",
+                (session_id, user_id, credential_id, ip_address, user_agent, device_fingerprint, created_at, session_secret) 
+                VALUES (@SessionId, @UserId, @CredentialId, @IpAddress, @UserAgent, @DeviceFingerprint, @CreatedAt, @SessionSecret)",
             session);
     }
 
     public async Task<Session?> Get(string sessionId)
     {
         var session = await dbConnection.QuerySingleOrDefaultAsync<Session>(
-            @$"SELECT * FROM {TableNames.UserSessions} WHERE session_id = @sessionId AND ended_at IS NULL",
+            @$"SELECT * FROM {TableNames.UserSessions} WHERE session_id = @sessionId AND expires_at IS NULL",
             new { sessionId });
 
         if (session is null)
@@ -304,14 +289,21 @@ public class SessionRepository(IDbConnection dbConnection, IAesEncryptor aesEncr
     public async Task Delete(string sessionId, DateTime now)
     {
         await dbConnection.ExecuteAsync(
-            @$"UPDATE {TableNames.UserSessions} SET ended_at = @now WHERE session_id = @sessionId AND ended_at IS NULL",
+            @$"UPDATE {TableNames.UserSessions} SET expires_at = @now WHERE session_id = @sessionId AND expires_at IS NULL",
             new { sessionId, now });
     }
 
     public async Task DeleteUserSessions(SnowflakeId userId, DateTime now)
     {
         await dbConnection.ExecuteAsync(
-            @$"UPDATE {TableNames.UserSessions} SET ended_at = @now WHERE user_id = @userId AND ended_at IS NULL",
+            @$"UPDATE {TableNames.UserSessions} SET expires_at = @now WHERE user_id = @userId AND expires_at IS NULL",
             new { userId, now });
+    }
+
+    public Task<Session?> GetByOrchestration(string orchestrationId)
+    {
+        return dbConnection.QuerySingleOrDefaultAsync<Session>(
+            @$"SELECT * FROM {TableNames.UserSessions} WHERE orchestration_id = @orchestrationId AND expires_at IS NULL",
+            new { orchestrationId });
     }
 }

@@ -12,7 +12,7 @@ public static class AccountsModuleSetup
 {
     public static IServiceCollection AddAccountsFunctionality(this IServiceCollection services)
     {
-        services.AddScoped<IUsernameAvailabilityChecker, UsernameAvailabilityChecker>();
+        services.AddScoped<ICredentialAvailabilityChecker, CredentialAvailabilityChecker>();
 
         services.AddSingleton<IPasswordPolicy, PasswordPolicy>();
 

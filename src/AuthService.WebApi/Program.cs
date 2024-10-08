@@ -24,7 +24,6 @@ builder.AddBusSetup();
 builder.AddCaching();
 builder.AddAuthSetup();
 builder.AddDatabase();
-// Dapper.SqlMapper.AddTypeHandler(new SnowflakeIdTypeHandler());
 builder.Host.AddLoggingSetup();
 builder.Host.AddOpenTelemetrySetup();
 

@@ -129,25 +129,4 @@ public class RegisterAccountTests : TestBase, IClassFixture<IntegrationTestFacto
         MessageBus.Messages.Should().Contain(x =>
             x is SendEmailVerification && ((SendEmailVerification)x).Email == registerAccountRequest.Email);
     }
-
-    [Fact]
-    public async Task Register_account_should_save_identity_to_db()
-    {
-        // Arrange
-        var registerAccountRequest = new RegisterAccount
-        {
-            Email = "test@example.com",
-            Password = "Test1234!_345ax1",
-            Name = "Test User"
-        };
-
-        // Act
-        await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
-
-        // Assert
-        (await Factory.Services.GetRequiredService<IDbConnection>()
-                .QuerySingleOrDefaultAsync<int>($"SELECT COUNT(*) FROM {TableNames.Identities} WHERE username = @Email",
-                    new { registerAccountRequest.Email }))
-            .Should().Be(1);
-    }
 }

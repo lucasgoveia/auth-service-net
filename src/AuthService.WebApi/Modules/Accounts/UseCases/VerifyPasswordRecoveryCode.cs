@@ -46,7 +46,7 @@ public class VerifyPasswordRecoveryCodeHandler(
         var validCode = await passwordRecoveryManager.Verify(req.Email, req.Code);
 
         var userInfo = await dbConnection.QuerySingleOrDefaultAsync<(SnowflakeId id, SnowflakeId userId)?>(
-            $"SELECT id, user_id FROM {TableNames.Identities} WHERE username = @Email", req);
+            $"SELECT id, user_id FROM {TableNames.Credentials} WHERE identifier = @Email AND type = 'email'::iam.credential_type", req);
 
         if (!validCode || userInfo is null)
         {

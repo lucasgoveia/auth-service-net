@@ -1,6 +1,7 @@
 ﻿using AuthService.WebApi.Common;
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Modules.Auth.UseCases;
+using AuthService.WebApi.Modules.Auth.UseCases.Login;
 using LucasGoveia.Results.AspNetCore;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,19 +11,50 @@ public static class AuthModuleSetup
 {
     public static IServiceCollection AddAuthFunctionality(this IServiceCollection services)
     {
-        services.AddScoped<LoginHandler>();
+        services.AddScoped<LoginWithEmailNPasswordHandler>();
         services.AddScoped<RefreshTokenHandler>();
         services.AddScoped<LogOutHandler>();
+        services.AddScoped<ExchangePCKEHandler>();
 
         return services;
     }
 
+    private static async Task<IResult> LoginWithEmailNPassword(
+        [FromServices] LoginWithEmailNPasswordHandler handler,
+        [FromServices] RequestPipe pipe,
+        [FromBody] LoginWithEmailNPasswordData body,
+        [FromQuery] string codeChallenge,
+        [FromQuery] string codeChallengeMethod,
+        [FromQuery] string redirectUri,
+        CancellationToken ct
+    )
+    {
+        var req = new LoginWithEmailNPassword
+        {
+            Body = body,
+            CodeChallenge = codeChallenge,
+            CodeChallengeMethod = codeChallengeMethod,
+            RedirectUri = redirectUri
+        };
+
+        var result = await pipe.Pipe(req, handler.Handle, ct);
+
+        return result.TryGetValue(out var code) 
+            ? Results.Redirect($"{redirectUri}?code={code}") 
+            : result.ToApiResult();
+    }
+    
+    private static async Task<IResult> ExchangePCKE(
+        [FromServices] ExchangePCKEHandler handler,
+        [FromServices] RequestPipe pipe,
+        [FromBody] ExchangePCKE body,
+        CancellationToken ct
+    ) => (await pipe.Pipe(body, handler.Handle, ct)).ToApiResult();
+
+
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder builder)
     {
-        builder.MapPost("login",
-                async ([FromBody] Login req, [FromServices] LoginHandler handler, [FromServices] RequestPipe pipe,
-                    CancellationToken ct) => (await pipe.Pipe(req, handler.Handle, ct)).ToApiResult()
-            )
+        builder.MapPost("login", LoginWithEmailNPassword)
             .RequireNotAuthenticated();
 
         builder.MapPost("token",

@@ -15,8 +15,4 @@
       <PackageReference Include="StackExchange.Redis" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="Results\" />
-    </ItemGroup>
-
 </Project>

@@ -39,6 +39,6 @@ public class UserEmailGetter(IDbConnection dbConnection) : IUserEmailGetter
     public async Task<string> Get(SnowflakeId userId, CancellationToken ct = default)
     {
         return await dbConnection.QuerySingleAsync<string>(
-            $"SELECT email FROM {TableNames.Users} WHERE Id = @userId", new { userId });
+            $"SELECT email FROM {TableNames.UserEmails} WHERE user_id = @userId", new { userId });
     }
 }

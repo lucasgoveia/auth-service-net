@@ -3,16 +3,17 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Modules.Auth.UseCases;
+using AuthService.WebApi.Modules.Auth.UseCases.Login;
 using FluentAssertions;
 
 namespace AuthService.WebApi.Tests.UseCases.Auth;
 
-public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
+public class LoginWithEmailNPasswordDataTests : TestBase, IClassFixture<IntegrationTestFactory>
 {
     private const string TestEmail = "test@example.com";
     private const string TestPassword = "Test1234!_345ax1";
 
-    public LoginTests(IntegrationTestFactory factory) : base(factory)
+    public LoginWithEmailNPasswordDataTests(IntegrationTestFactory factory) : base(factory)
     {
     }
 
@@ -34,9 +35,9 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task Login_with_valid_credentials_should_be_success()
     {
         // Arrange
-        var loginReq = new Login
+        var loginReq = new LoginWithEmailNPasswordData
         {
-            Username = TestEmail,
+            Email = TestEmail,
             Password = TestPassword,
             RememberMe = false,
         };
@@ -52,9 +53,9 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task Login_with_valid_credentials_should_return_access_token()
     {
         // Arrange
-        var loginReq = new Login
+        var loginReq = new LoginWithEmailNPasswordData
         {
-            Username = TestEmail,
+            Email = TestEmail,
             Password = TestPassword,
             RememberMe = false,
         };
@@ -71,9 +72,9 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task Login_with_invalid_password_should_return_unauthorized()
     {
         // Arrange
-        var loginReq = new Login
+        var loginReq = new LoginWithEmailNPasswordData
         {
-            Username = TestEmail,
+            Email = TestEmail,
             Password = "INVALID_PASSWORD",
             RememberMe = false,
         };
@@ -89,9 +90,9 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task Login_with_not_existing_username_should_return_unauthorized()
     {
         // Arrange
-        var loginReq = new Login
+        var loginReq = new LoginWithEmailNPasswordData
         {
-            Username = "some_other_email@example.com",
+            Email = "some_other_email@example.com",
             Password = TestPassword,
             RememberMe = false,
         };
@@ -107,9 +108,9 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task Login_3_times_with_invalid_password_should_lockout_account()
     {
         // Arrange
-        var loginReq = new Login
+        var loginReq = new LoginWithEmailNPasswordData
         {
-            Username = TestEmail,
+            Email = TestEmail,
             Password = "WRONG_PASSWORD",
             RememberMe = false,
         };
@@ -133,9 +134,9 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task Login_should_allow_after_lockout_end()
     {
         // Arrange
-        var loginReq = new Login
+        var loginReq = new LoginWithEmailNPasswordData
         {
-            Username = TestEmail,
+            Email = TestEmail,
             Password = "WRONG_PASSWORD",
             RememberMe = false,
         };
@@ -161,9 +162,9 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task Login_lockout_should_increment_with_failed_attempts()
     {
         // Arrange
-        var loginReq = new Login
+        var loginReq = new LoginWithEmailNPasswordData
         {
-            Username = TestEmail,
+            Email = TestEmail,
             Password = "WRONG_PASSWORD",
             RememberMe = false,
         };
@@ -193,9 +194,9 @@ public class LoginTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task Login_should_not_allow_if_already_authenticated()
     {
         // Arrange
-        var loginReq = new Login
+        var loginReq = new LoginWithEmailNPasswordData
         {
-            Username = TestEmail,
+            Email = TestEmail,
             Password = TestPassword,
             RememberMe = false,
         };

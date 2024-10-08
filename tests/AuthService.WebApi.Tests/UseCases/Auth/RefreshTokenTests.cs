@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using AuthService.WebApi.Common.Auth;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Modules.Auth.UseCases;
+using AuthService.WebApi.Modules.Auth.UseCases.Login;
 using AuthService.WebApi.Tests.Utils;
 using FluentAssertions;
 using Microsoft.Net.Http.Headers;
@@ -34,10 +35,10 @@ public class RefreshTokenTests : TestBase, IClassFixture<IntegrationTestFactory>
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
         res.EnsureSuccessStatusCode();
         
-        res = await Client.PostAsJsonAsync("/login", new Login
+        res = await Client.PostAsJsonAsync("/login", new LoginWithEmailNPasswordData
         {
             Password = registerAccountRequest.Password,
-            Username = registerAccountRequest.Email,
+            Email = registerAccountRequest.Email,
             RememberMe = true,
         });
         
@@ -129,9 +130,9 @@ public class RefreshTokenTests : TestBase, IClassFixture<IntegrationTestFactory>
     public async Task RefreshToken_in_non_trusted_device_should_not_extend_expiration()
     {
         // Arrange
-        var registerAccountRequest = new Login
+        var registerAccountRequest = new LoginWithEmailNPasswordData
         {
-            Username = "test@example.com",
+            Email = "test@example.com",
             Password = "Test1234!_345ax1",
             RememberMe = false,
         };
@@ -165,9 +166,9 @@ public class RefreshTokenTests : TestBase, IClassFixture<IntegrationTestFactory>
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
         Client.DefaultRequestHeaders.Add("Cookie", _cookies);
         await Client.PostAsync("/logout", null);
-        var registerAccountRequest = new Login
+        var registerAccountRequest = new LoginWithEmailNPasswordData
         {
-            Username = "test@example.com",
+            Email = "test@example.com",
             Password = "Test1234!_345ax1",
             RememberMe = true,
         };

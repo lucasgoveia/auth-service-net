@@ -11,6 +11,7 @@ public record RefreshToken
 public record RefreshTokenResponse
 {
     public required string AccessToken { get; init; }
+    public required string RefreshToken { get; init; }
 }
 
 public class RefreshTokenHandler(ITokenManager tokenManager)
@@ -18,6 +19,6 @@ public class RefreshTokenHandler(ITokenManager tokenManager)
     public async Task<Result<RefreshTokenResponse>> Handle(RefreshToken req, CancellationToken ct = default)
     {
         return (await tokenManager.RefreshToken(ct))
-            .Map(accessToken => new RefreshTokenResponse { AccessToken = accessToken });
+            .Map((a) => new RefreshTokenResponse { AccessToken = a.accessToken, RefreshToken = a.refreshToken });
     }
 }

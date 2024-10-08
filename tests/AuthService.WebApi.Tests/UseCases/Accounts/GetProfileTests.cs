@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using AuthService.WebApi.Modules.Accounts.UseCases;
 using AuthService.WebApi.Modules.Auth.UseCases;
+using AuthService.WebApi.Modules.Auth.UseCases.Login;
 using FluentAssertions;
 
 namespace AuthService.WebApi.Tests.UseCases.Accounts;
@@ -26,10 +27,10 @@ public class GetProfileTests : TestBase, IClassFixture<IntegrationTestFactory>
         var res = await Client.PostAsJsonAsync("/accounts/register", registerAccountRequest);
         res.EnsureSuccessStatusCode();
 
-        res = await Client.PostAsJsonAsync("/login", new Login
+        res = await Client.PostAsJsonAsync("/login", new LoginWithEmailNPasswordData
         {
             Password = registerAccountRequest.Password,
-            Username = registerAccountRequest.Email,
+            Email = registerAccountRequest.Email,
             RememberMe = true,
         });
         
