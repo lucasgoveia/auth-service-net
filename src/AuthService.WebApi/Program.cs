@@ -1,4 +1,5 @@
 using AuthService.Mailing;
+using AuthService.WebApi.Common.Middlewares;
 using AuthService.WebApi.Configurations;
 using AuthService.WebApi.Modules.Accounts;
 using AuthService.WebApi.Modules.Accounts.UseCases;
@@ -36,6 +37,8 @@ builder.Host.AddMailingSetup();
 builder.Services.AddAccountsFunctionality();
 builder.Services.AddAuthFunctionality();
 
+builder.Services.AddScoped<SessionIdentifierMiddleware>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -55,6 +58,7 @@ app.UseCors(c =>
     c.AllowCredentials();
 });
 
+app.UseMiddleware<SessionIdentifierMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 

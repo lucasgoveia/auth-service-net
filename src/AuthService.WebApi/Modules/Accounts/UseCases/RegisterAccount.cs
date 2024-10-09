@@ -22,6 +22,7 @@ public record RegisterAccount
 public record RegisterAccountResponse
 {
     public required string AccessToken { get; init; }
+    public required string refreshToken { get; init; }
 }
 
 public class RegisterAccountValidator : AbstractValidator<RegisterAccount>
@@ -59,13 +60,13 @@ public sealed class RegisterAccountHandler(
         var credential = EmailPasswordCredential.Create(userId, identityId, req.Email, hashedPassword, utcNow());
         var user = User.CreateNewUser(userId, req.Name, req.Email, utcNow());
 
-        await saver.Save(user, credential.ToCredentialData());
+        await saver.Save(user, credential.ToCredentialData(), ct);
 
         await emailVerificationManager.SendCode(userId, req.Email);
 
-        var token = await authenticationService.Authenticate(userId, identityId, true, ct);
+        var (accessToken, refreshToken) = await authenticationService.Authenticate(userId, identityId, true, ct);
 
-        return Result.Created(new RegisterAccountResponse { AccessToken = token });
+        return Result.Created(new RegisterAccountResponse { AccessToken = accessToken, refreshToken = refreshToken });
     }
 }
 

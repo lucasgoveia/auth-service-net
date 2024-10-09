@@ -1,14 +1,7 @@
-﻿using System.Data;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using AuthService.Common;
-using AuthService.Common.Consts;
-using AuthService.Common.Messaging;
-using AuthService.Common.Security;
 using AuthService.Common.Timestamp;
 using AuthService.WebApi.Common.Devices;
-using AuthService.WebApi.Messages.Events;
-using Dapper;
-using LucasGoveia.Results;
 using LucasGoveia.SnowflakeId;
 
 namespace AuthService.WebApi.Common.Auth;
@@ -45,7 +38,7 @@ public class AuthenticationService(
             var refreshToken = await tokenManager.GenerateRefreshToken();
             actity?.AddEvent(new ActivityEvent("RefreshTokenGenerated", utcNow()));
 
-            var accessToken = tokenManager.GenerateAccessToken(userId, identityId);
+            var accessToken = await tokenManager.GenerateAccessToken(userId, identityId);
             actity?.AddEvent(new ActivityEvent("AccessTokenGenerated", utcNow()));
 
             return (accessToken, refreshToken);
@@ -55,7 +48,6 @@ public class AuthenticationService(
 
     public async Task LogOut(CancellationToken ct = default)
     {
-        await tokenManager.RevokeRefreshTokenGroup();
         await tokenManager.RevokeAccessToken();
         await sessionManager.TerminateSession();
         logger.LogInformation("user logged out");

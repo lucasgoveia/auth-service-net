@@ -19,7 +19,6 @@ public record Session
 {
     public int Id { get; init; }
     public required string SessionId { get; init; } = null!;
-    public required string OrchestrationId { get; init; } = null!;
     public required SnowflakeId UserId { get; init; }
     public required SnowflakeId CredentialId { get; init; }
     public required string IpAddress { get; init; } = null!;
@@ -37,11 +36,10 @@ public interface ISessionManager
     SnowflakeId? UserId { get; }
     string? SessionId { get; }
 
-    Task<Session> CreateSession(SnowflakeId userId, SnowflakeId identityId, DeviceDto device, bool trustedDevice, TimeSpan lifetime);
+    Task<Session> CreateSession(SnowflakeId userId, SnowflakeId identityId, DeviceDto device, bool trustedDevice);
     Task<Session?> GetActiveSession();
     Task TerminateSession();
     Task TerminateAllSessions();
-    Task SetActiveSessionByOrchestrationId(string orchestrationId);
     Task SetActiveSessionById(string sessionId);
 }
 
@@ -63,6 +61,7 @@ public class SessionManager : ISessionManager
     private Session? _session;
     private readonly ICacher _cacher;
     private readonly ILogger<SessionManager> _logger;
+    private readonly AuthConfig _authConfig;
 
     private SnowflakeId? _userId;
     private SnowflakeId? _identityId;
@@ -109,7 +108,7 @@ public class SessionManager : ISessionManager
     }
 
     public SessionManager(ISecureKeyGenerator keyGenerator, IHttpContextAccessor httpContextAccessor,
-        UtcNow utcNow, ISessionRepository sessionRepository, ICacher cacher, ILogger<SessionManager> logger)
+        UtcNow utcNow, ISessionRepository sessionRepository, ICacher cacher, ILogger<SessionManager> logger, IOptions<AuthConfig> authConfig)
     {
         _keyGenerator = keyGenerator;
         _httpContextAccessor = httpContextAccessor;
@@ -117,6 +116,7 @@ public class SessionManager : ISessionManager
         _sessionRepository = sessionRepository;
         _cacher = cacher;
         _logger = logger;
+        _authConfig = authConfig.Value;
 
         if (httpContextAccessor.HttpContext?.Request.Cookies.TryGetValue(AuthCookieNames.SessionId,
                 out var sessionId) ?? false)
@@ -125,20 +125,27 @@ public class SessionManager : ISessionManager
         }
     }
     
-    public async Task<Session> CreateSession(SnowflakeId userId, SnowflakeId identityId, DeviceDto device, bool trustedDevice, TimeSpan lifetime)
+    private TimeSpan GetSessionLifetime(bool trustedDevice)
+    {
+        return trustedDevice
+            ? TimeSpan.FromHours(_authConfig.SessionTrustedDevicesLifetimeHours)
+            : TimeSpan.FromHours(_authConfig.SessionDefaultLifetimeHours);
+    }
+    
+    public async Task<Session> CreateSession(SnowflakeId userId, SnowflakeId identityId, DeviceDto device, bool trustedDevice)
     {
         _logger.LogInformation("creating session for user {userId} with IP {device.IpAddress}", userId, device.IpAddress);
         return await ApiActivitySource.Instance.WithActivity(async activity =>
         {
             var sessionId = _keyGenerator.Generate(SessionIdAlphabet, SessionIdLength);
-            var orchestrationId = _keyGenerator.Generate(SessionIdAlphabet, SessionIdLength);
 
             var now = _utcNow();
+            
+            var lifetime = GetSessionLifetime(trustedDevice);
 
             _session = new Session
             {
                 SessionId = sessionId,
-                OrchestrationId = orchestrationId,
                 UserId = userId,
                 CredentialId = identityId,
                 IpAddress = device.IpAddress,
@@ -158,7 +165,9 @@ public class SessionManager : ISessionManager
                     HttpOnly = true,
                     Expires = _session.ExpiresAt,
                     MaxAge = lifetime,
-                    SameSite = SameSiteMode.Strict
+                    SameSite = SameSiteMode.Lax,
+                    IsEssential = true,
+                    // Domain = _authConfig.SessionCookieDomain
                 });
             activity?.AddEvent(new ActivityEvent("AddedSessionCookie", now));
 
@@ -207,7 +216,9 @@ public class SessionManager : ISessionManager
             Path = "/",
             HttpOnly = true,
             Expires = _utcNow().AddYears(-1),
-            SameSite = SameSiteMode.Strict
+            SameSite = SameSiteMode.Lax,
+            IsEssential = true,
+            Domain = _authConfig.SessionCookieDomain
         });
         await _sessionRepository.Delete(SessionId, _utcNow());
         await _cacher.ClearPattern(BuildSessionPattern(UserId!.Value, SessionId));
@@ -222,11 +233,6 @@ public class SessionManager : ISessionManager
 
         await _sessionRepository.DeleteUserSessions(UserId.Value, _utcNow());
         await _cacher.ClearPattern(BuildUserSessionsPattern(UserId.Value));
-    }
-    
-    public async Task SetActiveSessionByOrchestrationId(string orchestrationId)
-    {
-        _session = await _sessionRepository.GetByOrchestration(orchestrationId);
     }
 
     public async Task SetActiveSessionById(string sessionId)
@@ -247,7 +253,6 @@ public interface ISessionRepository
     Task<Session?> Get(string sessionId);
     Task Delete(string sessionId, DateTime now);
     Task DeleteUserSessions(SnowflakeId userId, DateTime now);
-    Task<Session?> GetByOrchestration(string orchestrationId);
 }
 
 public class SessionRepository(IDbConnection dbConnection, IAesEncryptor aesEncryptor, IOptions<JwtConfig> jwtConfig)
@@ -299,11 +304,5 @@ public class SessionRepository(IDbConnection dbConnection, IAesEncryptor aesEncr
             @$"UPDATE {TableNames.UserSessions} SET expires_at = @now WHERE user_id = @userId AND expires_at IS NULL",
             new { userId, now });
     }
-
-    public Task<Session?> GetByOrchestration(string orchestrationId)
-    {
-        return dbConnection.QuerySingleOrDefaultAsync<Session>(
-            @$"SELECT * FROM {TableNames.UserSessions} WHERE orchestration_id = @orchestrationId AND expires_at IS NULL",
-            new { orchestrationId });
-    }
+    
 }

@@ -52,6 +52,11 @@ public class LoginWithEmailNPasswordValidator : AbstractValidator<LoginWithEmail
     }
 }
 
+public record LoginResponse
+{
+    public required string Code { get; init; }
+}
+
 public class LoginWithEmailNPasswordHandler(
     IMessageBus messageBus,
     UtcNow utcNow,
@@ -60,9 +65,9 @@ public class LoginWithEmailNPasswordHandler(
     PCKEManager pckeManager
 )
 {
-    public async Task<Result<string>> Handle(LoginWithEmailNPassword req, CancellationToken ct = default)
+    public async Task<Result<LoginResponse>> Handle(LoginWithEmailNPassword req, CancellationToken ct = default)
     {
-        return await ApiActivitySource.Instance.WithActivity<Result<string>>(async (activity) =>
+        return await ApiActivitySource.Instance.WithActivity<Result<LoginResponse>>(async (activity) =>
         {
             activity?.AddTag("login.type", CredentialType.Email);
             activity?.AddTag("login.identifier", req.Body.Email);
@@ -86,7 +91,7 @@ public class LoginWithEmailNPasswordHandler(
             var pckeCode = await pckeManager.New(credential.UserId, credential.Id, req.CodeChallenge, req.CodeChallengeMethod, req.RedirectUri, req.Body.RememberMe );
 
             await messageBus.Publish(new LoginAttemptSucceed { UserId = credential.UserId }, ct);
-            return Result.Ok(pckeCode);
+            return Result.Ok(new LoginResponse { Code = pckeCode});
         });
     }
 }

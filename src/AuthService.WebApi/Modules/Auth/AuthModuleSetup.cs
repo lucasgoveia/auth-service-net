@@ -15,6 +15,7 @@ public static class AuthModuleSetup
         services.AddScoped<RefreshTokenHandler>();
         services.AddScoped<LogOutHandler>();
         services.AddScoped<ExchangePCKEHandler>();
+        services.AddScoped<PCKEManager>();
 
         return services;
     }
@@ -37,11 +38,7 @@ public static class AuthModuleSetup
             RedirectUri = redirectUri
         };
 
-        var result = await pipe.Pipe(req, handler.Handle, ct);
-
-        return result.TryGetValue(out var code) 
-            ? Results.Redirect($"{redirectUri}?code={code}") 
-            : result.ToApiResult();
+        return (await pipe.Pipe(req, handler.Handle, ct)).ToApiResult();
     }
     
     private static async Task<IResult> ExchangePCKE(
@@ -56,6 +53,8 @@ public static class AuthModuleSetup
     {
         builder.MapPost("login", LoginWithEmailNPassword)
             .RequireNotAuthenticated();
+
+        builder.MapPost("exchange-pcke", ExchangePCKE);
 
         builder.MapPost("token",
                 async ([FromServices] RefreshTokenHandler handler, [FromServices] RequestPipe pipe,

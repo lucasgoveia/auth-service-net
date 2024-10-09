@@ -1,15 +1,11 @@
 ﻿using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Security.Principal;
-using System.Text;
 using System.Text.Encodings.Web;
 using AuthService.Common.Timestamp;
 using LucasGoveia.SnowflakeId;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace AuthService.WebApi.Common.Auth;
@@ -26,13 +22,22 @@ public class CustomJwtAuthenticationOptions : AuthenticationSchemeOptions
 
 public class CustomJwtAuthenticationHandler(IOptionsMonitor<CustomJwtAuthenticationOptions> options,
         ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock, IOptions<JwtConfig> jwtConfig,
-        RsaKeyHolder rsaKeyHolder, UtcNow utcNow, ITokenManager tokenManager)
+        RsaKeyHolder rsaKeyHolder, UtcNow utcNow, ITokenManager tokenManager, ISessionManager sessionManager)
     : AuthenticationHandler<CustomJwtAuthenticationOptions>(options, logger, encoder, clock)
 {
     private readonly JwtConfig _jwtConfig = jwtConfig.Value;
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        var endpoint = Context.GetEndpoint();
+
+        // Check if the endpoint has any authorization metadata
+        if (endpoint?.Metadata?.GetMetadata<IAuthorizeData>() == null)
+        {
+            // If the endpoint does not require authentication, skip it
+            return AuthenticateResult.NoResult();
+        }
+        
         var token = Request.GetTokenFromAuthorizationHeader();
 
         if (string.IsNullOrEmpty(token))
@@ -52,6 +57,13 @@ public class CustomJwtAuthenticationHandler(IOptionsMonitor<CustomJwtAuthenticat
 
     private async Task<(JwtSecurityToken?, bool)> ValidateToken(string token)
     {
+        var session = await sessionManager.GetActiveSession();
+
+        if (session is null)
+        {
+            return (null, false);
+        }
+        
         var key = rsaKeyHolder.GetPublicKey();
 
         var tokenHandler = new JwtSecurityTokenHandler();

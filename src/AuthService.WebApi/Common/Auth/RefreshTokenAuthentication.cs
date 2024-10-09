@@ -22,7 +22,7 @@ public class RefreshTokenAuthenticationOptions : AuthenticationSchemeOptions
 
 public class RefreshTokenAuthenticationHandler(IOptionsMonitor<RefreshTokenAuthenticationOptions> options,
         ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock, ISessionManager sessionManager,
-        IOptions<JwtConfig> jwtConfig, UtcNow utcNow, ITokenManager tokenManager)
+        IOptions<JwtConfig> jwtConfig, UtcNow utcNow)
     : AuthenticationHandler<RefreshTokenAuthenticationOptions>(options, logger, encoder,
     clock)
 {
@@ -30,7 +30,7 @@ public class RefreshTokenAuthenticationHandler(IOptionsMonitor<RefreshTokenAuthe
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        var token = Request.GetTokenFromCookie(AuthCookieNames.RefreshTokenCookieName);
+        var token = Request.GetTokenFromAuthorizationHeader();
         
         if (string.IsNullOrEmpty(token))
         {
@@ -65,17 +65,8 @@ public class RefreshTokenAuthenticationHandler(IOptionsMonitor<RefreshTokenAuthe
             tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
 
             var jwtToken = (validatedToken as JwtSecurityToken)!;
-
-            var refreshTokenInfo = await tokenManager.GetRefreshTokenInfo();
-
-            if (refreshTokenInfo is null)
-            {
-                return (null, false);
-            }
-
-            return refreshTokenInfo.UsageCount >= _jwtConfig.RefreshTokenAllowedRenewsCount
-                ? (null, false)
-                : (jwtToken, true);
+            
+            return (jwtToken, true);
         }
         catch (SecurityTokenException)
         {

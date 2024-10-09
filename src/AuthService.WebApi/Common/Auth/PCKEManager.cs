@@ -1,4 +1,5 @@
 ﻿using System.Security.Cryptography;
+using System.Text;
 using AuthService.Common.Caching;
 using AuthService.Common.Security;
 using LucasGoveia.Results;
@@ -17,17 +18,33 @@ public record PCKEFlowData
     public required bool RememberMe { get; set; }
 }
 
-public class PCKEManager(ISecureKeyGenerator secureKeyGenerator, IPasswordHasher passwordHasher, ICacher cacher)
+public class PCKEManager(ISecureKeyGenerator secureKeyGenerator, ICacher cacher, ILogger<PCKEManager> logger)
 {
-    private static readonly char[] Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".ToCharArray();
+    private static readonly char[] Alphabet =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".ToCharArray();
 
     private static string CacheKey(string code) => $"pkce:{code}";
-
-    public async Task<string> New(SnowflakeId userId, SnowflakeId credentialId, string codeChallenge, string codeChallengeMethod, string redirectUri, bool rememberMe = false)
+    
+    private static string DigestCode(string code)
     {
+        using var sha256 = SHA256.Create();
+        var hashedCode = sha256.ComputeHash(Encoding.UTF8.GetBytes(code)).Select(x => x.ToString("x2"))
+            .Aggregate(new StringBuilder(), (sb, x) => sb.Append(x))
+            .ToString();
+        
+        return hashedCode;
+    }
+
+    public async Task<string> New(SnowflakeId userId, SnowflakeId credentialId, string codeChallenge,
+        string codeChallengeMethod, string redirectUri, bool rememberMe = false)
+    {
+        using var sha256 = SHA256.Create();
         var code = secureKeyGenerator.Generate(Alphabet, 128);
 
-        var hashedCode = passwordHasher.Hash(code);
+        var hashedCode = DigestCode(code);
+
+        logger.LogDebug("New PKCE flow for code {Code} and user {UserId}", code, userId);
+        logger.LogDebug("Hashed code {HashedCode}", hashedCode);
 
         await cacher.Set(CacheKey(hashedCode), new PCKEFlowData
         {
@@ -42,9 +59,13 @@ public class PCKEManager(ISecureKeyGenerator secureKeyGenerator, IPasswordHasher
         return code;
     }
 
-    public async Task<Result<(SnowflakeId userId, SnowflakeId credentialId, bool rememberMe)>> Exchange(string code, string codeVerifier, string redirectUri)
+    public async Task<Result<(SnowflakeId userId, SnowflakeId credentialId, bool rememberMe)>> Exchange(string code,
+        string codeVerifier, string redirectUri)
     {
-        var hashedCode = passwordHasher.Hash(code);
+        var hashedCode = DigestCode(code);
+
+        logger.LogDebug("Exchanging PKCE flow for code {Code}", code);
+        logger.LogDebug("Hashed code {HashedCode}", hashedCode);
 
         var data = await cacher.GetAndRemove<PCKEFlowData>(CacheKey(hashedCode));
 
@@ -69,4 +90,3 @@ public class PCKEManager(ISecureKeyGenerator secureKeyGenerator, IPasswordHasher
             : Result.Unauthorized();
     }
 }
-

@@ -1,9 +1,7 @@
 ﻿using System.Security.Claims;
 using System.Security.Principal;
-using System.Text.Encodings.Web;
 using AuthService.Common.Timestamp;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace AuthService.WebApi.Common.Auth;
@@ -30,24 +28,7 @@ public static class JwtUtils
 
         return token;
     }
-
-    public static string? GetTokenFromCookie(this HttpRequest request, string cookieName)
-    {
-        if (!request.Cookies.ContainsKey(cookieName))
-            return null;
-
-        if (!request.Cookies.TryGetValue(cookieName, out var cookie))
-        {
-            return null;
-        }
-
-        if (string.IsNullOrEmpty(cookie))
-        {
-            return null;
-        }
-
-        return cookie;
-    }
+    
 
     public static AuthenticationTicket CreateAuthenticationTicket(string userId, string identityId, string scheme)
     {
@@ -63,7 +44,7 @@ public static class JwtUtils
         return ticket;
     }
     
-    public static TokenValidationParameters GetTokenValidationParameters(SecurityKey key, UtcNow utcNow, JwtConfig jwtConfig)
+    public static TokenValidationParameters GetTokenValidationParameters(SecurityKey key, UtcNow utcNow, JwtConfig jwtConfig, TimeSpan? clockSkew = null)
     {
         return new TokenValidationParameters
         {
@@ -77,7 +58,7 @@ public static class JwtUtils
             ValidIssuer = jwtConfig.Issuer,
             ValidateLifetime = true,
             LifetimeValidator = (_, expires, _, _) => expires >= utcNow(),
-            ClockSkew = TimeSpan.Zero,
+            ClockSkew = clockSkew ?? TimeSpan.Zero,
         };
     }
 }

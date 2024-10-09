@@ -185,10 +185,6 @@ table "user_sessions" {
     null = false
     type = varchar(32)
   }
-  column "orchestration_id" {
-    null = false
-    type = varchar(32)
-  }
   column "user_id" {
     null = false
     type = bigint
@@ -237,10 +233,6 @@ table "user_sessions" {
   
   unique "user_sessions_session_id_unique" {
     columns = [column.session_id]
-  }
-  
-  unique "user_sessions_orchestration_id_unique" {
-    columns = [column.orchestration_id]
   }
   
   index "column.user_id" {

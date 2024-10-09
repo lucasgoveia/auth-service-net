@@ -42,7 +42,7 @@ public class ExchangePCKEHandler(
             return Result.Unauthorized();
         }
 
-        var (accessToken, refreshToken) = await authenticationService.Authenticate(pair.userId, pair.userId, false, ct);
+        var (accessToken, refreshToken) = await authenticationService.Authenticate(pair.userId, pair.credentialId, false, ct);
 
         return Result.Ok(new ExchangePCKEResponse { AccessToken = accessToken, RefreshToken = refreshToken });
     }

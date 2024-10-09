@@ -35,6 +35,7 @@ public class ChangePasswordValidator : AbstractValidator<ChangePassword>
 public record ChangePasswordResponse
 {
     public required string AccessToken { get; init; }
+    public required string RefreshToken { get; init; }
 }
 
 public class ChangePasswordHandler(
@@ -55,12 +56,13 @@ public class ChangePasswordHandler(
             await authenticationService.LogOutAllSessions(ct);
         }
 
-        var accessToken = await authenticationService.Authenticate(sessionManager.UserId!.Value,
+        var (accessToken, refreshToken) = await authenticationService.Authenticate(sessionManager.UserId!.Value,
             sessionManager.IdentityId!.Value, true, ct);
 
         return Result.Ok(new ChangePasswordResponse
         {
-            AccessToken = accessToken
+            AccessToken = accessToken,
+            RefreshToken = refreshToken
         });
     }
 }

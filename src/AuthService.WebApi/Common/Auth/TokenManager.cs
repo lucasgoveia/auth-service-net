@@ -25,7 +25,6 @@ public interface ITokenManager
     Task RevokeUserAccessTokens(SnowflakeId userId);
 }
 
-
 public class TokenManager(
     UtcNow utcNow,
     IOptions<JwtConfig> jwtConfig,
@@ -50,37 +49,22 @@ public class TokenManager(
     private static string BuildGlobalAccessTokenRevocationKey(SnowflakeId accountId) =>
         $"users:{accountId}:last-global-access-token-revocation";
 
-    private TimeSpan GetRefreshTokenLifetime(bool trustedDevice)
-    {
-        logger.LogDebug("RefreshTokenInTrustedDevicesHoursLifetime: {RefreshTokenInTrustedDevicesHoursLifetime}",
-            _jwtConfig.RefreshTokenInTrustedDevicesHoursLifetime);
-        logger.LogDebug("RefreshTokenHoursLifetime: {RefreshTokenHoursLifetime}",
-            _jwtConfig.RefreshTokenHoursLifetime);
-        var refreshTokenLifetime = trustedDevice
-            ? TimeSpan.FromHours(_jwtConfig.RefreshTokenInTrustedDevicesHoursLifetime)
-            : TimeSpan.FromHours(_jwtConfig.RefreshTokenHoursLifetime);
-        return refreshTokenLifetime;
-    }
 
     public async Task<string> GenerateRefreshToken()
     {
         var session = (await sessionManager.GetActiveSession())!;
-        var exp = GetRefreshTokenLifetime(session.TrustedDevice);
-        return await GenerateRefreshToken(session, exp);
+        return await GenerateRefreshToken(session);
     }
 
-    private async Task<string> GenerateRefreshToken(Session session, TimeSpan expiration)
+    private async Task<string> GenerateRefreshToken(Session session)
     {
         return await ApiActivitySource.Instance.WithActivity(activity =>
         {
             activity?.AddTag("userId", session.UserId);
-            activity?.AddTag("lifetime", expiration);
 
-            logger.LogInformation("Generating and setting refresh token for {userId} with {expiration}", session.UserId,
-                expiration);
+            logger.LogInformation("Generating refresh token for {userId}.", session.UserId);
 
-            var refreshToken = GenerateRefreshToken(session.UserId, session.CredentialId,
-                session.SessionSecret, expiration, session.OrchestrationId);
+            var refreshToken = GenerateRefreshToken(session.UserId, session.CredentialId, session.SessionSecret);
             activity?.AddEvent(new ActivityEvent("RefreshTokenGenerated", utcNow()));
 
             return Task.FromResult(refreshToken);
@@ -93,9 +77,9 @@ public class TokenManager(
         var refreshTokenStr = httpContextAccessor.HttpContext!.Request.Cookies[AuthCookieNames.RefreshTokenCookieName]!;
         var refreshToken = ReadToken(refreshTokenStr);
         var tokenId = Guid.Parse(refreshToken.Id);
-        
+
         var session = (await sessionManager.GetActiveSession())!;
- 
+
 
         logger.LogInformation("Refreshing token for {userId}", session.UserId);
 
@@ -109,10 +93,9 @@ public class TokenManager(
         }
 
         await cacher.Set(BuildRefreshTokenKey(session.UserId, tokenId), 1,
-            TimeSpan.FromMinutes(_jwtConfig.RefreshTokenHoursLifetime));
+            TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime + 2));
 
-        var newRefreshToken =
-            await GenerateRefreshToken(session, TimeSpan.FromMinutes(_jwtConfig.RefreshTokenHoursLifetime));
+        var newRefreshToken = await GenerateRefreshToken(session);
 
         var newAccessToken = await GenerateAccessToken(session.UserId, session.CredentialId);
 
@@ -155,18 +138,16 @@ public class TokenManager(
             TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
     }
 
-    public async Task<string> GenerateAccessToken(SnowflakeId userId, SnowflakeId identityId)
+    public Task<string> GenerateAccessToken(SnowflakeId userId, SnowflakeId identityId)
     {
-        var session = await sessionManager.GetActiveSession();
-        var orchestrationId = session!.OrchestrationId;
-        return ApiActivitySource.Instance.WithActivity((_) =>
-            GenerateAsymmetricToken(userId, identityId, orchestrationId, TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime)));
+        return Task.FromResult<string>(ApiActivitySource.Instance.WithActivity((_) =>
+            GenerateAsymmetricToken(userId, identityId, TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime))));
     }
 
     public string GenerateResetPasswordAccessToken(SnowflakeId userId, SnowflakeId identityId)
     {
         return GenerateSymmetricToken(userId, identityId, _jwtConfig.ResetPasswordTokenSecret,
-            TimeSpan.FromMinutes(_jwtConfig.ResetPasswordTokenMinutesLifetime), null);
+            TimeSpan.FromMinutes(_jwtConfig.ResetPasswordTokenMinutesLifetime));
     }
 
     public Task RevokeUserAccessTokens(SnowflakeId userId)
@@ -175,14 +156,14 @@ public class TokenManager(
             TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime));
     }
 
-    private string GenerateRefreshToken(SnowflakeId userId, SnowflakeId identityId, string sessionSecret,
-        TimeSpan lifetime, string orchestrationId)
+    private string GenerateRefreshToken(SnowflakeId userId, SnowflakeId identityId, string sessionSecret)
     {
         return ApiActivitySource.Instance.WithActivity((_) =>
-            GenerateSymmetricToken(userId, identityId, sessionSecret, lifetime, orchestrationId));
+            GenerateSymmetricToken(userId, identityId, sessionSecret,
+                TimeSpan.FromMinutes(_jwtConfig.AccessTokenMinutesLifetime)));
     }
 
-    private string GenerateSymmetricToken(SnowflakeId userId, SnowflakeId identityId, string secret, TimeSpan lifetime, string? orchestrationId)
+    private string GenerateSymmetricToken(SnowflakeId userId, SnowflakeId identityId, string secret, TimeSpan lifetime)
     {
         var now = utcNow();
         var claims = new[]
@@ -192,12 +173,7 @@ public class TokenManager(
             new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
-
-        if (!string.IsNullOrEmpty(orchestrationId))
-            claims = claims
-                .Append(new Claim(CustomJwtClaimsNames.SessionOrchestrationId, orchestrationId))
-                .ToArray();
-
+        
         var expiry = utcNow().Add(lifetime);
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
@@ -214,8 +190,7 @@ public class TokenManager(
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    private string GenerateAsymmetricToken(SnowflakeId userId, SnowflakeId credentialId, string orchestrationId,
-        TimeSpan lifetime)
+    private string GenerateAsymmetricToken(SnowflakeId userId, SnowflakeId credentialId, TimeSpan lifetime)
     {
         var securityKey = rsaKeyHolder.GetPrivateKey();
 
@@ -229,7 +204,6 @@ public class TokenManager(
         {
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim(CustomJwtClaimsNames.CredentialId, credentialId.ToString()),
-            new Claim(CustomJwtClaimsNames.SessionOrchestrationId, orchestrationId),
             new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(), ClaimValueTypes.Integer64),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
