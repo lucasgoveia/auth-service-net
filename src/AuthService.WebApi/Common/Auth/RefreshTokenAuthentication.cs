@@ -17,7 +17,7 @@ public static class RefreshTokenAuthentication
 
 public class RefreshTokenAuthenticationOptions : AuthenticationSchemeOptions
 {
-    public static CustomJwtAuthenticationOptions Instance = new();
+    public static RefreshTokenAuthenticationOptions Instance = new();
 }
 
 public class RefreshTokenAuthenticationHandler(IOptionsMonitor<RefreshTokenAuthenticationOptions> options,
