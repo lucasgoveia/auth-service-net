@@ -17,4 +17,4 @@ timeout = "5s"
 path = "/health"
 
 [[vm]]
-size = "shared-cpu-2x"
+size = "shared-cpu-1x"
